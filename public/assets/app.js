@@ -20,6 +20,7 @@
   };
 
   window.updateThemeButton=updateThemeButton;
+  updateThemeButton();
 })();
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const icons={
