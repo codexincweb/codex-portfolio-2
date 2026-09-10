@@ -1,9 +1,21 @@
 {
-  "name":"codex-inc-portfolio",
-  "version":"2.0.0",
-  "private":true,
-  "description":"Codex Inc professional portfolio with PostgreSQL CMS",
-  "main":"server/index.js",
-  "scripts":{"start":"node server/index.js","check":"node --check server/index.js && node --check server/db.js && node --check public/assets/app.js"},
-  "dependencies":{"connect-pg-simple":"^10.0.0","dotenv":"^16.4.7","express":"^4.21.2","express-session":"^1.18.1","multer":"^2.0.2","pg":"^8.16.3"}
+  "name": "codex-inc-portfolio",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Codex Inc professional portfolio with PostgreSQL CMS",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "check": "node --check server/index.js && node --check server/db.js && node --check public/assets/app.js"
+  },
+  "dependencies": {
+    "cloudinary": "^1.41.3",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
+    "pg": "^8.16.3"
+  }
 }
