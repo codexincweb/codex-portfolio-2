@@ -36,11 +36,23 @@ function uploadToCloudinary(file,folder){
       },
       (error,result)=>{
         if(error)return reject(error);
-        resolve(result.secure_url);
+        resolve({
+          url:result.secure_url,
+          public_id:result.public_id
+        });
       }
     );
     stream.end(file.buffer);
   });
+}
+
+async function deleteFromCloudinary(publicId){
+  if(!publicId)return;
+  try{
+    await cloudinary.uploader.destroy(publicId,{resource_type:'image',invalidate:true});
+  }catch(error){
+    console.error('Cloudinary delete error:',error.message);
+  }
 }
 
 app.set('trust proxy',1);
@@ -119,10 +131,25 @@ app.get('/api/admin/me',admin,(req,res)=>{
 
 app.put('/api/admin/profile',admin,upload.single('image'),async(req,res)=>{
   const {name,title,bio,location}=req.body;
+
+  const current=await query(
+    'SELECT image_public_id FROM profile WHERE id=1'
+  );
+
   let image=req.body.image_url||null;
+  let publicId=null;
 
   if(req.file){
-    image=await uploadToCloudinary(req.file,'codex-inc/profile');
+    const uploaded=await uploadToCloudinary(
+      req.file,
+      'codex-inc/profile'
+    );
+    image=uploaded.url;
+    publicId=uploaded.public_id;
+
+    if(current.rows[0]?.image_public_id){
+      await deleteFromCloudinary(current.rows[0].image_public_id);
+    }
   }
 
   const r=await query(
@@ -132,10 +159,11 @@ app.put('/api/admin/profile',admin,upload.single('image'),async(req,res)=>{
          bio=COALESCE($3,bio),
          location=COALESCE($4,location),
          image_url=COALESCE($5,image_url),
+         image_public_id=COALESCE($6,image_public_id),
          updated_at=now()
      WHERE id=1
      RETURNING *`,
-    [name,title,bio,location,image]
+    [name,title,bio,location,image,publicId]
   );
 
   res.json(r.rows[0]);
@@ -148,9 +176,15 @@ app.post('/api/admin/works',admin,upload.single('image'),async(req,res)=>{
   }=req.body;
 
   let image=null;
+  let publicId=null;
 
   if(req.file){
-    image=await uploadToCloudinary(req.file,'codex-inc/projects');
+    const uploaded=await uploadToCloudinary(
+      req.file,
+      'codex-inc/projects'
+    );
+    image=uploaded.url;
+    publicId=uploaded.public_id;
   }
 
   const tech=(req.body.tech||'')
@@ -160,8 +194,8 @@ app.post('/api/admin/works',admin,upload.single('image'),async(req,res)=>{
 
   const r=await query(
     `INSERT INTO works
-     (slug,title,category,summary,description,tech,live_url,repo_url,image_url,featured)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     (slug,title,category,summary,description,tech,live_url,repo_url,image_url,image_public_id,featured)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING *`,
     [
       slug,
@@ -173,6 +207,7 @@ app.post('/api/admin/works',admin,upload.single('image'),async(req,res)=>{
       live_url||null,
       repo_url||null,
       image,
+      publicId,
       featured==='true'
     ]
   );
@@ -186,10 +221,29 @@ app.put('/api/admin/works/:id',admin,upload.single('image'),async(req,res)=>{
     live_url,repo_url,featured
   }=req.body;
 
+  const current=await query(
+    'SELECT image_public_id FROM works WHERE id=$1',
+    [req.params.id]
+  );
+
+  if(!current.rowCount){
+    return res.status(404).json({error:'Not found'});
+  }
+
   let image=null;
+  let publicId=null;
 
   if(req.file){
-    image=await uploadToCloudinary(req.file,'codex-inc/projects');
+    const uploaded=await uploadToCloudinary(
+      req.file,
+      'codex-inc/projects'
+    );
+    image=uploaded.url;
+    publicId=uploaded.public_id;
+
+    if(current.rows[0].image_public_id){
+      await deleteFromCloudinary(current.rows[0].image_public_id);
+    }
   }
 
   const tech=(req.body.tech||'')
@@ -207,9 +261,10 @@ app.put('/api/admin/works/:id',admin,upload.single('image'),async(req,res)=>{
          live_url=$6,
          repo_url=$7,
          image_url=COALESCE($8,image_url),
-         featured=$9,
+         image_public_id=COALESCE($9,image_public_id),
+         featured=$10,
          updated_at=now()
-     WHERE id=$10
+     WHERE id=$11
      RETURNING *`,
     [
       title,
@@ -220,17 +275,31 @@ app.put('/api/admin/works/:id',admin,upload.single('image'),async(req,res)=>{
       live_url||null,
       repo_url||null,
       image,
+      publicId,
       featured==='true',
       req.params.id
     ]
   );
 
-  if(!r.rowCount)return res.status(404).json({error:'Not found'});
   res.json(r.rows[0]);
 });
 
 app.delete('/api/admin/works/:id',admin,async(req,res)=>{
+  const current=await query(
+    'SELECT image_public_id FROM works WHERE id=$1',
+    [req.params.id]
+  );
+
+  if(!current.rowCount){
+    return res.status(404).json({error:'Not found'});
+  }
+
   await query('DELETE FROM works WHERE id=$1',[req.params.id]);
+
+  if(current.rows[0].image_public_id){
+    await deleteFromCloudinary(current.rows[0].image_public_id);
+  }
+
   res.json({ok:true});
 });
 

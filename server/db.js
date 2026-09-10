@@ -45,6 +45,8 @@ async function query(text, params) {
 }
 
 async function initDb() {
+  await query('ALTER TABLE profile ADD COLUMN IF NOT EXISTS image_public_id text');
+  await query('ALTER TABLE works ADD COLUMN IF NOT EXISTS image_public_id text');
   await query(`
     CREATE TABLE IF NOT EXISTS profile (
       id integer PRIMARY KEY,
