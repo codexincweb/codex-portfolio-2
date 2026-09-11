@@ -254,6 +254,68 @@ app.post('/api/team-up/apply',resumeUpload.single('resume'),async(req,res)=>{
 
 
 
+
+async function sendTeamUpDecisionEmail(application){
+  const approved = application.status === 'approved';
+
+  const subject = approved
+    ? 'Your Codex Inc Team Up application has been approved'
+    : 'Update on your Codex Inc Team Up application';
+
+  const communitySection = approved && application.community_link
+    ? `
+      <p>Your application has been approved. Welcome to Codex Inc Team Up.</p>
+      <p>
+        Join the community using the link below:
+      </p>
+      <p>
+        <a href="${application.community_link}"
+           style="display:inline-block;padding:12px 18px;background:#111827;color:#fff;text-decoration:none;border-radius:8px">
+          Join Codex Inc Team Up
+        </a>
+      </p>
+    `
+    : `
+      <p>Thank you for taking the time to apply to Codex Inc Team Up.</p>
+      <p>
+        After reviewing your application, we are unable to approve it at this time.
+      </p>
+    `;
+
+  await mailer.sendMail({
+    from:`${process.env.SMTP_FROM_NAME||'Codex Inc'} <${process.env.SMTP_FROM_EMAIL||process.env.SMTP_USER}>`,
+    to:application.email,
+    subject,
+    html:`
+      <!DOCTYPE html>
+      <html>
+        <body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,sans-serif;color:#17202a">
+          <div style="max-width:620px;margin:40px auto;background:#fff;padding:32px;border-radius:14px">
+            <h2 style="margin-top:0">Codex Inc Team Up</h2>
+
+            <p>Hello ${application.full_name},</p>
+
+            ${communitySection}
+
+            ${
+              application.admin_notes
+                ? `<p><strong>Message from the review team:</strong></p>
+                   <p>${String(application.admin_notes).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>`
+                : ''
+            }
+
+            <p style="margin-top:28px">
+              Regards,<br>
+              <strong>Codex Inc</strong>
+            </p>
+          </div>
+        </body>
+      </html>
+    `
+  });
+}
+
+
 app.patch('/api/admin/team-up/:id',admin,async(req,res)=>{
   try{
     const id = Number(req.params.id);
@@ -287,9 +349,16 @@ app.patch('/api/admin/team-up/:id',admin,async(req,res)=>{
       return res.status(404).json({error:'Application not found'});
     }
 
+    try{
+      await sendTeamUpDecisionEmail(result.rows[0]);
+    }catch(mailError){
+      console.error('Team Up decision email error:',mailError);
+    }
+
     return res.json({
       success:true,
-      application:result.rows[0]
+      application:result.rows[0],
+      email_sent:true
     });
 
   }catch(error){
