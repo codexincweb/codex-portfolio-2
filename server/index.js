@@ -16,6 +16,9 @@ const mailer=nodemailer.createTransport({
   host:process.env.SMTP_HOST,
   port:Number(process.env.SMTP_PORT||587),
   secure:Number(process.env.SMTP_PORT||587)===465,
+  connectionTimeout:10000,
+  greetingTimeout:10000,
+  socketTimeout:10000,
   auth:{
     user:process.env.SMTP_USER,
     pass:process.env.SMTP_PASS
@@ -221,24 +224,24 @@ app.post('/api/team-up/apply',resumeUpload.single('resume'),async(req,res)=>{
       ]
     );
 
-    try{
-      await sendTeamUpNotification({
-        id:result.rows[0].id,
-        status:result.rows[0].status,
-        full_name:full_name.trim(),
-        country:country.trim(),
-        mobile:mobile.trim(),
-        email:email.trim().toLowerCase(),
-        company:company?.trim()||null,
-        experience_level:experience_level.trim(),
-        skills,
-        portfolio_url:portfolio_url?.trim()||null,
-        bio:bio?.trim()||null,
-        resume_url:resume.url
-      });
-    }catch(mailError){
-      console.error('Team Up notification email failed:',mailError.message);
-    }
+    const application={
+      id:result.rows[0].id,
+      status:result.rows[0].status,
+      full_name:full_name.trim(),
+      country:country.trim(),
+      mobile:mobile.trim(),
+      email:email.trim().toLowerCase(),
+      company:company?.trim()||null,
+      experience_level:experience_level.trim(),
+      skills,
+      portfolio_url:portfolio_url?.trim()||null,
+      bio:bio?.trim()||null,
+      resume_url:resume.url
+    };
+
+    sendTeamUpNotification(application)
+      .then(()=>console.log(`Team Up admin email sent for application ${application.id}`))
+      .catch(mailError=>console.error('Team Up notification email failed:',mailError.message));
 
     res.status(201).json({
       success:true,
@@ -349,17 +352,17 @@ app.patch('/api/admin/team-up/:id',admin,async(req,res)=>{
       return res.status(404).json({error:'Application not found'});
     }
 
-    try{
-      await sendTeamUpDecisionEmail(result.rows[0]);
-    }catch(mailError){
-      console.error('Team Up decision email error:',mailError);
-    }
+    const application=result.rows[0];
 
-    return res.json({
+    res.json({
       success:true,
-      application:result.rows[0],
-      email_sent:true
+      application,
+      email_queued:true
     });
+
+    sendTeamUpDecisionEmail(application)
+      .then(()=>console.log(`Team Up ${status} email sent to ${application.email}`))
+      .catch(mailError=>console.error('Team Up decision email error:',mailError));
 
   }catch(error){
     console.error('Team Up review error:',error);
