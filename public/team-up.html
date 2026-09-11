@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Team up with Codex Inc. Apply to collaborate on technology, cybersecurity, creative, writing and digital product projects.">
+<title>Team Up — Codex Inc</title>
+<script>if(localStorage.getItem("codex-theme")==="dark")document.documentElement.classList.add("dark");</script>
+<link rel="icon" href="/assets/placeholder.svg">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+<div class="wrap nav">
+<a class="brand" href="/">Codex Inc</a>
+
+<nav class="navlinks">
+<a href="/">Home</a>
+<a href="/about.html">About me</a>
+<a href="/works.html">Works</a>
+<a href="/services.html">Services</a>
+<a href="/experience.html">Experience</a>
+<a href="/contact.html">Contact</a>
+</nav>
+
+<div class="nav-actions">
+<button class="theme-toggle" type="button" data-theme-toggle onclick="toggleTheme()" aria-label="Switch to dark mode" title="Switch to dark mode"></button>
+<a class="btn primary" href="/contact.html">Work with me</a>
+</div>
+</div>
+</header>
+
+<main>
+
+<section class="hero">
+<div class="wrap">
+<div class="eyebrow">Collaboration · Community · Opportunity</div>
+<h1>Team up with Codex Inc.</h1>
+<p class="lead">
+We are building a network of people with different skills who can collaborate,
+learn, create and contribute to meaningful digital projects.
+</p>
+</div>
+</section>
+
+<section class="section">
+<div class="wrap">
+
+<div class="section-head">
+<div>
+<div class="eyebrow">Apply to collaborate</div>
+<h2>Tell us what you can bring to the team.</h2>
+</div>
+</div>
+
+<form id="team-up-form" class="form" enctype="multipart/form-data">
+<div class="split">
+
+<div>
+<label for="fullName">Full name</label>
+<input id="fullName" name="full_name" type="text" placeholder="Your full name" required>
+</div>
+
+<div>
+<label for="country-search">Country</label>
+<div class="country-picker" data-country-picker>
+  <button class="country-trigger" type="button" aria-expanded="false">
+    <span class="country-selected">Select your country</span>
+    <span class="country-chevron">⌄</span>
+  </button>
+  <div class="country-menu">
+    <input class="country-search" id="country-search" type="search" placeholder="Search country..." autocomplete="off">
+    <div class="country-options"></div>
+  </div>
+  <input type="hidden" id="country" name="country" required>
+</div></div>
+
+<div>
+<label for="mobile">Mobile / WhatsApp number</label>
+<div class="phone-field">
+<span class="phone-code" id="phone-code">+234</span>
+<input id="mobile" name="mobile" type="tel" placeholder="Enter your mobile number" autocomplete="tel" required>
+</div>
+</div>
+
+<div>
+<label for="email">Email address</label>
+<input id="email" name="email" type="email" placeholder="you@example.com" required>
+</div>
+
+<div>
+<label for="company">Company / Organization <span class="muted">(optional)</span></label>
+<input id="company" name="company" type="text" placeholder="If applicable">
+</div>
+
+<div>
+<label for="experience">Experience level</label>
+<select id="experience" name="experience_level" required>
+<option value="">Select experience level</option>
+<option>Beginner</option>
+<option>Intermediate</option>
+<option>Advanced</option>
+<option>Professional</option>
+</select>
+</div>
+
+</div>
+
+<div style="margin-top:24px">
+<label>What are you good at?</label>
+<p class="muted">Select all areas that apply to you.</p>
+
+<div class="skills-grid">
+
+<label class="skill-option"><input type="checkbox" name="skills" value="Web Development"> Web Development</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Frontend Development"> Frontend Development</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Backend Development"> Backend Development</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Full-Stack Development"> Full-Stack Development</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Mobile App Development"> Mobile App Development</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Software Engineering"> Software Engineering</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="API Development"> API Development</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Database Management"> Database Management</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="DevOps / Cloud"> DevOps / Cloud</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="System Architecture"> System Architecture</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Software Testing"> Software Testing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Automation Testing"> Automation Testing</label>
+
+<label class="skill-option"><input type="checkbox" name="skills" value="Cybersecurity"> Cybersecurity</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Penetration Testing"> Penetration Testing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Vulnerability Assessment"> Vulnerability Assessment</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Network Security"> Network Security</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Application Security"> Application Security</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Security Testing"> Security Testing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Digital Forensics"> Digital Forensics</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Security Research"> Security Research</label>
+
+<label class="skill-option"><input type="checkbox" name="skills" value="UI/UX Design"> UI/UX Design</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Graphic Design"> Graphic Design</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Video Editing"> Video Editing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Motion Graphics"> Motion Graphics</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Photography"> Photography</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Content Creation"> Content Creation</label>
+
+<label class="skill-option"><input type="checkbox" name="skills" value="Technical Writing"> Technical Writing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Ebook Writing"> Ebook Writing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Author"> Author</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Copywriting"> Copywriting</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Digital Story Writing"> Digital Story Writing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Documentation"> Documentation</label>
+
+<label class="skill-option"><input type="checkbox" name="skills" value="Data Analysis"> Data Analysis</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Research"> Research</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Digital Marketing"> Digital Marketing</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Community Management"> Community Management</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Product Management"> Product Management</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Project Management"> Project Management</label>
+<label class="skill-option"><input type="checkbox" name="skills" value="Other"> Other</label>
+
+</div>
+</div>
+
+<div style="margin-top:24px">
+<label for="portfolio">Portfolio / Website <span class="muted">(optional)</span></label>
+<input id="portfolio" name="portfolio" type="url" placeholder="https://...">
+</div>
+
+<div style="margin-top:24px">
+<label for="intro">Tell us about yourself</label>
+<textarea id="intro" name="intro" rows="6" placeholder="Briefly describe your skills, experience and what you would like to contribute." required></textarea>
+</div>
+
+<div style="margin-top:24px">
+<label for="resume">Resume / CV</label>
+<input id="resume" name="resume" type="file" accept=".pdf,.doc,.docx" required>
+<p class="muted">Accepted formats: PDF, DOC and DOCX.</p>
+</div>
+
+<div style="margin-top:24px">
+<label class="skill-option">
+<input type="checkbox" required>
+I confirm that the information provided is accurate and I am interested in collaborating with Codex Inc.
+</label>
+</div>
+
+<div style="margin-top:28px">
+<button class="btn primary" type="submit">Apply to Team</button>
+</div>
+
+</div>
+
+</div>
+</form>
+</section>
+
+</main>
+
+<div data-footer></div>
+<script src="/assets/app.js"></script>
+</body>
+</html>

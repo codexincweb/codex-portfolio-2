@@ -17,12 +17,13 @@ const pool = new Pool({
   // Keep the pool small on Termux/Android.
   max: Number(process.env.DB_POOL_MAX || 2),
 
-  // Do not deliberately destroy idle Neon connections.
-  idleTimeoutMillis: 0,
+  // Recycle connections before long-lived Neon connections become stale.
+  idleTimeoutMillis: 30000,
+  maxLifetimeSeconds: 300,
 
-  connectionTimeoutMillis: 15000,
+  connectionTimeoutMillis: 20000,
 
-  // Help keep long-lived TLS connections alive.
+  // Help keep TLS connections alive on Termux/Android.
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 
@@ -40,8 +41,34 @@ pool.on('error', (err) => {
   );
 });
 
-async function query(text, params) {
-  return pool.query(text, params);
+async function query(text, params, attempt=1) {
+  try{
+    return await pool.query(text, params);
+  }catch(error){
+    const retryable=[
+      'ECONNABORTED',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ECONNREFUSED',
+      '57P01',
+      '57P02',
+      '57P03'
+    ];
+
+    if(attempt<3 && retryable.includes(error.code)){
+      const delay=attempt*1000;
+
+      console.error(
+        `[PostgreSQL] Query failed with ${error.code}. Retrying in ${delay/1000}s...`
+      );
+
+      await new Promise(resolve=>setTimeout(resolve,delay));
+
+      return query(text,params,attempt+1);
+    }
+
+    throw error;
+  }
 }
 
 async function initDb() {

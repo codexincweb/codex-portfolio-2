@@ -5,10 +5,56 @@ const pgSession=require('connect-pg-simple')(session);
 const multer=require('multer');
 const {v2:cloudinary}=require('cloudinary');
 const {pool,query,initDb}=require('./db');
+const nodemailer=require('nodemailer');
 require('dotenv').config();
 
 const app=express();
 const PORT=Number(process.env.PORT||3000);
+
+
+const mailer=nodemailer.createTransport({
+  host:process.env.SMTP_HOST,
+  port:Number(process.env.SMTP_PORT||587),
+  secure:Number(process.env.SMTP_PORT||587)===465,
+  auth:{
+    user:process.env.SMTP_USER,
+    pass:process.env.SMTP_PASS
+  }
+});
+
+async function sendTeamUpNotification(application){
+  const skills=Array.isArray(application.skills)
+    ? application.skills.join(', ')
+    : String(application.skills||'');
+
+  await mailer.sendMail({
+    from:`${process.env.SMTP_FROM_NAME||'Codex Inc'} <${process.env.SMTP_FROM_EMAIL||process.env.SMTP_USER}>`,
+    to:process.env.ADMIN_EMAIL,
+    replyTo:application.email,
+    subject:`New Team Up Application — ${application.full_name}`,
+    text:[
+      'A new Team Up application has been submitted.',
+      '',
+      `Name: ${application.full_name}`,
+      `Country: ${application.country}`,
+      `Mobile: ${application.mobile}`,
+      `Email: ${application.email}`,
+      `Company/Organization: ${application.company||'Not provided'}`,
+      `Experience level: ${application.experience_level}`,
+      `Skills: ${skills}`,
+      `Portfolio: ${application.portfolio_url||'Not provided'}`,
+      '',
+      'About the applicant:',
+      application.bio||'Not provided',
+      '',
+      `Resume: ${application.resume_url}`,
+      '',
+      `Application ID: ${application.id}`,
+      `Status: ${application.status}`
+    ].join('\n')
+  });
+}
+
 
 cloudinary.config({
   cloud_name:process.env.CLOUDINARY_CLOUD_NAME,
@@ -86,6 +132,165 @@ app.use(session(sessionConfig));
 app.use(express.static(path.join(__dirname,'..','public')));
 
 const admin=(req,res,next)=>req.session?.admin?next():res.status(401).json({error:'Unauthorized'});
+
+
+const resumeUpload=multer({
+  storage:multer.memoryStorage(),
+  limits:{fileSize:10*1024*1024},
+  fileFilter:(req,file,cb)=>{
+    const allowed=[
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
+    if(allowed.includes(file.mimetype)) cb(null,true);
+    else cb(new Error('Only PDF, DOC, and DOCX resume files are allowed'));
+  }
+});
+
+function uploadResumeToCloudinary(file){
+  return new Promise((resolve,reject)=>{
+    const stream=cloudinary.uploader.upload_stream(
+      {
+        folder:'codex-inc/team-up/resumes',
+        resource_type:'raw',
+        use_filename:true,
+        unique_filename:true
+      },
+      (error,result)=>{
+        if(error)return reject(error);
+        resolve({
+          url:result.secure_url,
+          public_id:result.public_id
+        });
+      }
+    );
+    stream.end(file.buffer);
+  });
+}
+
+app.post('/api/team-up/apply',resumeUpload.single('resume'),async(req,res)=>{
+  try{
+    const {
+      full_name,
+      country,
+      mobile,
+      email,
+      company,
+      experience_level,
+      portfolio_url,
+      bio
+    }=req.body;
+
+    let skills=req.body.skills||[];
+    if(!Array.isArray(skills))skills=[skills];
+
+    if(!full_name||!country||!mobile||!email||!experience_level||!skills.length){
+      return res.status(400).json({error:'Please complete all required fields'});
+    }
+
+    if(!req.file){
+      return res.status(400).json({error:'Resume/CV is required'});
+    }
+
+    const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if(!emailPattern.test(email)){
+      return res.status(400).json({error:'Please provide a valid email address'});
+    }
+
+    const resume=await uploadResumeToCloudinary(req.file);
+
+    const result=await query(
+      `INSERT INTO team_up_applications
+      (full_name,country,mobile,email,company,experience_level,skills,portfolio_url,bio,resume_url,resume_public_id,resume_filename)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      RETURNING id,created_at,status`,
+      [
+        full_name.trim(),
+        country.trim(),
+        mobile.trim(),
+        email.trim().toLowerCase(),
+        company?.trim()||null,
+        experience_level.trim(),
+        skills,
+        portfolio_url?.trim()||null,
+        bio?.trim()||null,
+        resume.url,
+        resume.public_id,
+        req.file.originalname
+      ]
+    );
+
+    try{
+      await sendTeamUpNotification({
+        id:result.rows[0].id,
+        status:result.rows[0].status,
+        full_name:full_name.trim(),
+        country:country.trim(),
+        mobile:mobile.trim(),
+        email:email.trim().toLowerCase(),
+        company:company?.trim()||null,
+        experience_level:experience_level.trim(),
+        skills,
+        portfolio_url:portfolio_url?.trim()||null,
+        bio:bio?.trim()||null,
+        resume_url:resume.url
+      });
+    }catch(mailError){
+      console.error('Team Up notification email failed:',mailError.message);
+    }
+
+    res.status(201).json({
+      success:true,
+      message:'Your Team Up application has been submitted successfully.',
+      application_id:result.rows[0].id,
+      status:result.rows[0].status
+    });
+  }catch(error){
+    console.error('Team Up application error:',error);
+    res.status(500).json({error:'Unable to submit your application right now'});
+  }
+});
+
+
+app.get('/api/admin/team-up',admin,async(req,res)=>{
+  try{
+    const result=await query(
+      `SELECT
+        id,
+        full_name,
+        country,
+        mobile,
+        email,
+        company,
+        experience_level,
+        skills,
+        portfolio_url,
+        bio,
+        resume_url,
+        resume_filename,
+        status,
+        admin_notes,
+        community_link,
+        created_at,
+        reviewed_at
+       FROM team_up_applications
+       ORDER BY
+        CASE status
+          WHEN 'pending' THEN 1
+          WHEN 'approved' THEN 2
+          WHEN 'rejected' THEN 3
+          ELSE 4
+        END,
+        created_at DESC`
+    );
+
+    res.json(result.rows);
+  }catch(error){
+    console.error('Team Up admin list error:',error);
+    res.status(500).json({error:'Unable to load Team Up applications'});
+  }
+});
 
 app.get('/api/health',async(req,res)=>{
   try{
@@ -320,14 +525,40 @@ app.use((err,req,res,next)=>{
   res.status(400).json({error:err.message||'Request failed'});
 });
 
+async function initializeDatabaseWithRetry(){
+  const maxAttempts=5;
+
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+    try{
+      await initDb();
+      console.log(`Database initialized successfully (attempt ${attempt}/${maxAttempts})`);
+      return;
+    }catch(error){
+      console.error(
+        `Database initialization failed (attempt ${attempt}/${maxAttempts}):`,
+        error.code||error.message
+      );
+
+      if(attempt===maxAttempts){
+        throw error;
+      }
+
+      const delay=attempt*3000;
+      console.log(`Retrying database initialization in ${delay/1000}s...`);
+      await new Promise(resolve=>setTimeout(resolve,delay));
+    }
+  }
+}
+
 (async()=>{
   try{
-    await initDb();
-    app.listen(PORT,'0.0.0.0',()=>
+    await initializeDatabaseWithRetry();
+
+    app.listen(PORT,'0.0.0.0',()=>{
       console.log(`Codex Inc portfolio running on port ${PORT}`)
-    );
+    });
   }catch(e){
-    console.error(e);
+    console.error('Database initialization failed after all retries:',e);
     process.exit(1);
   }
 })();
