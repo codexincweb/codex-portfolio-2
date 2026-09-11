@@ -1,313 +1,172 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="robots" content="noindex,nofollow">
-  <title>Team Up Applications — Codex Inc">
-
-  <script>
-    if(localStorage.getItem("codex-theme")==="dark"){
-      document.documentElement.classList.add("dark");
-    }
-  </script>
-
-  <link rel="stylesheet" href="/styles.css">
-<style>
-.container{
-  width:min(calc(100% - 40px),1160px);
-  margin:0 auto;
-}
-
-.team-up-admin-grid{
-  display:grid;
-  grid-template-columns:minmax(280px,.8fr) minmax(320px,1.2fr);
-  gap:24px;
-}
-
-.application-item{
-  border:1px solid #e4e7ec;
-  border-radius:12px;
-  padding:16px;
-  margin-bottom:12px;
-  cursor:pointer;
-  background:#fff;
-}
-
-.application-item:hover,
-.application-item.active{
-  border-color:#155eef;
-}
-
-.status-badge{
-  display:inline-flex;
-  align-items:center;
-  padding:5px 9px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:700;
-  background:#f2f4f7;
-}
-
-.detail-row{
-  padding:14px 0;
-  border-bottom:1px solid #e4e7ec;
-}
-
-.detail-label{
-  display:block;
-  font-size:12px;
-  font-weight:750;
-  color:#667085;
-  margin-bottom:4px;
-}
-
-.detail-value{
-  overflow-wrap:anywhere;
-}
-
-.action-row{
-  display:flex;
-  gap:10px;
-  margin-top:24px;
-  flex-wrap:wrap;
-}
-
-.empty-state{
-  padding:30px 10px;
-  text-align:center;
-}
-
-.nav-actions{
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-
-.theme-toggle{
-  width:42px;
-  height:42px;
-  border:1px solid #e4e7ec;
-  border-radius:8px;
-  background:#fff;
-  cursor:pointer;
-}
-
-@media(max-width:800px){
-  .container{
-    width:min(calc(100% - 28px),1160px);
-  }
-
-  .team-up-admin-grid{
-    grid-template-columns:1fr;
-  }
-}
-</style>
-
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Team Up Applications — Codex Inc</title>
   <style>
-    .team-up-admin-grid{
-      display:grid;
-      grid-template-columns:minmax(280px, .8fr) minmax(320px, 1.2fr);
-      gap:24px;
-    }
-
-    .application-item{
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:18px;
-      margin-bottom:12px;
-      cursor:pointer;
-      transition:.2s ease;
-    }
-
-    .application-item:hover,
-    .application-item.active{
-      border-color:currentColor;
-      transform:translateY(-1px);
-    }
-
-    .application-item h3{
-      margin:0 0 6px;
-    }
-
-    .status-badge{
-      display:inline-flex;
-      align-items:center;
-      border:1px solid var(--line);
-      border-radius:999px;
-      padding:5px 10px;
-      font-size:12px;
-      text-transform:capitalize;
-    }
-
-    .detail-row{
-      padding:14px 0;
-      border-bottom:1px solid var(--line);
-    }
-
-    .detail-label{
-      display:block;
-      font-size:12px;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.05em;
-      margin-bottom:5px;
-      opacity:.7;
-    }
-
-    .detail-value{
-      white-space:pre-wrap;
-      overflow-wrap:anywhere;
-    }
-
-    .action-row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:24px;
-    }
-
-    .danger-btn{
-      border:1px solid #b42318;
-      color:#b42318;
-      background:transparent;
-    }
-
-    .danger-btn:hover{
-      background:#b42318;
-      color:#fff;
-    }
-
-    .success-btn{
-      border:1px solid #087443;
-      color:#087443;
-      background:transparent;
-    }
-
-    .success-btn:hover{
-      background:#087443;
-      color:#fff;
-    }
-
-    .empty-state{
-      padding:32px 10px;
-      text-align:center;
-    }
-
-    .resume-link{
-      display:inline-block;
-      margin-top:8px;
-    }
-
-    @media(max-width:800px){
-      .team-up-admin-grid{
-        grid-template-columns:1fr;
-      }
-    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:#f5f7fa;color:#101828}
+    header{background:#fff;border-bottom:1px solid #ddd;padding:16px 20px}
+    header div{max-width:1100px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:15px}
+    main{max-width:1100px;margin:30px auto;padding:0 20px}
+    h1{margin:0 0 8px}
+    .muted{color:#667085}
+    .layout{display:grid;grid-template-columns:360px 1fr;gap:20px;margin-top:25px}
+    .panel{background:#fff;border:1px solid #ddd;border-radius:12px;padding:20px}
+    .application{display:block;width:100%;text-align:left;background:#fff;border:1px solid #ddd;border-radius:10px;padding:15px;margin-bottom:10px;cursor:pointer}
+    .application:hover,.application.active{border-color:#155eef}
+    .application strong{display:block;font-size:16px;margin-bottom:5px}
+    .status{display:inline-block;margin-top:8px;padding:3px 8px;border-radius:20px;font-size:12px;background:#eef2f6}
+    .btn{border:0;border-radius:8px;padding:10px 15px;cursor:pointer;background:#155eef;color:#fff}
+    .btn.secondary{background:#667085}
+    .detail{padding:10px 0;border-bottom:1px solid #eee}
+    .detail strong{display:block;margin-bottom:3px}
+    a{color:#155eef}
+    @media(max-width:750px){.layout{grid-template-columns:1fr}}
   </style>
 </head>
-
 <body>
 
-<header class="site-header">
-  <div class="container nav">
-    <a class="brand" href="/index.html">Codex Inc</a>
-
-    <div class="nav-actions">
-      <button
-        class="theme-toggle"
-        type="button"
-        data-theme-toggle
-        onclick="toggleTheme()"
-        aria-label="Switch theme"
-        title="Switch theme">
-      </button>
-
-      <button class="btn btn-secondary" type="button" id="logout-btn">
-        Logout
-      </button>
-    </div>
+<header>
+  <div>
+    <strong>Codex Inc — Team Up Admin</strong>
+    <button class="btn secondary" id="logout">Logout</button>
   </div>
 </header>
 
-<main class="container" style="padding-top:48px;padding-bottom:64px">
+<main>
+  <h1>Team Up Applications</h1>
+  <p class="muted" id="message">Loading applications...</p>
 
-  <div style="margin-bottom:32px">
-    <p class="eyebrow">Admin</p>
-    <h1>Team Up Applications</h1>
-    <p class="muted">
-      Review and manage people who want to collaborate with Codex Inc.
-    </p>
-  </div>
-
-  <div class="team-up-admin-grid">
-
-    <section class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
-        <div>
-          <h2 style="margin:0">Applications</h2>
-          <p class="muted" id="application-count" style="margin:6px 0 0">
-            Loading...
-          </p>
-        </div>
-
-        <button class="btn btn-secondary" type="button" id="refresh-btn">
-          Refresh
-        </button>
-      </div>
-
-      <div id="applications-list" style="margin-top:24px">
-        <div class="muted">Loading applications...</div>
-      </div>
+  <div class="layout">
+    <section class="panel">
+      <h2>Applications</h2>
+      <div id="applications">Loading...</div>
     </section>
 
-    <section class="card" id="details-card">
-      <div id="application-details">
-        <div class="empty-state muted">
-          Select an application to view its full details.
-        </div>
+    <section class="panel">
+      <h2>Application Details</h2>
+      <div id="details">
+        <p class="muted">Select an application.</p>
       </div>
     </section>
-
   </div>
-
 </main>
 
 <script>
-function toggleTheme(){
-  const dark = document.documentElement.classList.toggle('dark');
-  localStorage.setItem('codex-theme', dark ? 'dark' : 'light');
-  const button = document.querySelector('[data-theme-toggle]');
-  if(button){
-    button.setAttribute(
-      'aria-label',
-      dark ? 'Switch to light mode' : 'Switch to dark mode'
-    );
-    button.setAttribute(
-      'title',
-      dark ? 'Switch to light mode' : 'Switch to dark mode'
-    );
-  }
-}
-
 (function(){
-  const dark = document.documentElement.classList.contains('dark');
-  const button = document.querySelector('[data-theme-toggle]');
-  if(button){
-    button.setAttribute(
-      'aria-label',
-      dark ? 'Switch to light mode' : 'Switch to dark mode'
-    );
-    button.setAttribute(
-      'title',
-      dark ? 'Switch to light mode' : 'Switch to dark mode'
-    );
+  const applicationsEl = document.getElementById('applications');
+  const detailsEl = document.getElementById('details');
+  const messageEl = document.getElementById('message');
+  const logoutEl = document.getElementById('logout');
+
+  let applications = [];
+
+  function esc(value){
+    return String(value ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
   }
+
+  function showDetails(app){
+    detailsEl.innerHTML = `
+      <div class="detail"><strong>Name</strong>${esc(app.full_name)}</div>
+      <div class="detail"><strong>Country</strong>${esc(app.country)}</div>
+      <div class="detail"><strong>Mobile</strong>${esc(app.mobile)}</div>
+      <div class="detail"><strong>Email</strong><a href="mailto:${esc(app.email)}">${esc(app.email)}</a></div>
+      <div class="detail"><strong>Company</strong>${esc(app.company || '—')}</div>
+      <div class="detail"><strong>Experience</strong>${esc(app.experience_level)}</div>
+      <div class="detail"><strong>Skills</strong>${esc((app.skills || []).join(', ') || '—')}</div>
+      <div class="detail"><strong>Portfolio</strong>${
+        app.portfolio_url
+          ? `<a href="${esc(app.portfolio_url)}" target="_blank" rel="noopener">Open portfolio</a>`
+          : '—'
+      }</div>
+      <div class="detail"><strong>Bio</strong>${esc(app.bio || '—')}</div>
+      <div class="detail"><strong>Resume</strong>${
+        app.resume_url
+          ? `<a href="${esc(app.resume_url)}" target="_blank" rel="noopener">View resume</a>`
+          : '—'
+      }</div>
+      <div class="detail"><strong>Status</strong><span class="status">${esc(app.status)}</span></div>
+      <div class="detail"><strong>Submitted</strong>${esc(app.created_at || '—')}</div>
+    `;
+  }
+
+  function render(){
+    if(!applications.length){
+      applicationsEl.innerHTML = '<p class="muted">No applications found.</p>';
+      messageEl.textContent = '0 applications';
+      return;
+    }
+
+    messageEl.textContent =
+      applications.length + (applications.length === 1 ? ' application' : ' applications');
+
+    applicationsEl.innerHTML = applications.map(app => `
+      <button class="application" type="button" data-id="${Number(app.id)}">
+        <strong>${esc(app.full_name)}</strong>
+        <span>${esc(app.email)}</span>
+        <br>
+        <span class="status">${esc(app.status)}</span>
+      </button>
+    `).join('');
+
+    applicationsEl.querySelectorAll('[data-id]').forEach(button => {
+      button.addEventListener('click', function(){
+        const app = applications.find(x => Number(x.id) === Number(this.dataset.id));
+        if(app) showDetails(app);
+      });
+    });
+
+    showDetails(applications[0]);
+  }
+
+  async function load(){
+    try{
+      const response = await fetch('/api/admin/team-up', {
+        credentials:'same-origin',
+        cache:'no-store'
+      });
+
+      if(response.status === 401){
+        window.location.href='/admin/login';
+        return;
+      }
+
+      const data = await response.json();
+
+      if(!response.ok){
+        throw new Error(data.error || 'Failed to load applications');
+      }
+
+      applications = Array.isArray(data) ? data : [];
+      render();
+
+    }catch(error){
+      console.error(error);
+      messageEl.textContent = 'Error loading applications';
+      applicationsEl.innerHTML =
+        '<p style="color:#b42318">Unable to load applications: ' +
+        esc(error.message) + '</p>';
+    }
+  }
+
+  logoutEl.addEventListener('click', async function(){
+    await fetch('/api/admin/logout',{
+      method:'POST',
+      credentials:'same-origin'
+    });
+    window.location.href='/admin/login';
+  });
+
+  load();
 })();
 </script>
-
-<script src="/assets/admin-team-up.js" defer></script>
 
 </body>
 </html>
