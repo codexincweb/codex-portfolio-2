@@ -350,27 +350,171 @@
 
   function showDetails(app){
     detailsEl.innerHTML = `
-      <div class="detail"><strong>Name</strong>${esc(app.full_name)}</div>
-      <div class="detail"><strong>Country</strong>${esc(app.country)}</div>
-      <div class="detail"><strong>Mobile</strong>${esc(app.mobile)}</div>
-      <div class="detail"><strong>Email</strong><a href="mailto:${esc(app.email)}">${esc(app.email)}</a></div>
-      <div class="detail"><strong>Company</strong>${esc(app.company || '—')}</div>
-      <div class="detail"><strong>Experience</strong>${esc(app.experience_level)}</div>
-      <div class="detail"><strong>Skills</strong>${esc((app.skills || []).join(', ') || '—')}</div>
-      <div class="detail"><strong>Portfolio</strong>${
-        app.portfolio_url
-          ? `<a href="${esc(app.portfolio_url)}" target="_blank" rel="noopener">Open portfolio</a>`
-          : '—'
-      }</div>
-      <div class="detail"><strong>Bio</strong>${esc(app.bio || '—')}</div>
-      <div class="detail"><strong>Resume</strong>${
-        app.resume_url
-          ? `<a href="${esc(app.resume_url)}" target="_blank" rel="noopener">View resume</a>`
-          : '—'
-      }</div>
-      <div class="detail"><strong>Status</strong><span class="status">${esc(app.status)}</span></div>
-      <div class="detail"><strong>Submitted</strong>${esc(app.created_at || '—')}</div>
+      <div class="details-header">
+        <div>
+          <h2>${esc(app.full_name)}</h2>
+          <p>${esc(app.email)}</p>
+        </div>
+        <span class="status status-${esc(app.status)}">${esc(app.status)}</span>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail">
+          <strong>Country</strong>
+          <div class="detail-value">${esc(app.country)}</div>
+        </div>
+
+        <div class="detail">
+          <strong>Mobile</strong>
+          <div class="detail-value">${esc(app.mobile)}</div>
+        </div>
+
+        <div class="detail">
+          <strong>Company / Organization</strong>
+          <div class="detail-value">${esc(app.company || '—')}</div>
+        </div>
+
+        <div class="detail">
+          <strong>Experience</strong>
+          <div class="detail-value">${esc(app.experience_level)}</div>
+        </div>
+
+        <div class="detail detail-full">
+          <strong>Skills</strong>
+          <div class="detail-value">${esc((app.skills || []).join(', ') || '—')}</div>
+        </div>
+
+        <div class="detail">
+          <strong>Portfolio</strong>
+          <div class="detail-value">${
+            app.portfolio_url
+              ? `<a href="${esc(app.portfolio_url)}" target="_blank" rel="noopener">Open portfolio</a>`
+              : '—'
+          }</div>
+        </div>
+
+        <div class="detail">
+          <strong>Resume</strong>
+          <div class="detail-value">${
+            app.resume_url
+              ? `<a href="${esc(app.resume_url)}" target="_blank" rel="noopener">View resume</a>`
+              : '—'
+          }</div>
+        </div>
+
+        <div class="detail detail-full">
+          <strong>About</strong>
+          <div class="detail-value">${esc(app.bio || '—')}</div>
+        </div>
+
+        <div class="detail">
+          <strong>Submitted</strong>
+          <div class="detail-value">${esc(app.created_at || '—')}</div>
+        </div>
+
+        <div class="detail">
+          <strong>Reviewed</strong>
+          <div class="detail-value">${esc(app.reviewed_at || '—')}</div>
+        </div>
+
+        <div class="detail detail-full">
+          <strong>Admin Notes</strong>
+          <textarea id="admin-notes" rows="4" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;resize:vertical;background:var(--surface);color:var(--text)">${esc(app.admin_notes || '')}</textarea>
+        </div>
+
+        <div class="detail detail-full">
+          <strong>Community Invite Link</strong>
+          <input id="community-link" type="url" value="${esc(app.community_link || '')}" placeholder="https://chat.whatsapp.com/..." style="width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text)">
+        </div>
+      </div>
+
+      ${
+        app.status === 'pending'
+        ? `
+          <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">
+            <button class="btn primary" type="button" id="approve-btn">Approve Application</button>
+            <button class="btn" type="button" id="reject-btn" style="color:var(--danger);border-color:#f1b8b2">Reject Application</button>
+          </div>
+        `
+        : `
+          <div style="margin-top:22px;padding:12px 14px;border-radius:10px;background:var(--surface-soft);color:var(--muted)">
+            This application has already been ${esc(app.status)}.
+          </div>
+        `
+      }
     `;
+
+    const approve = document.getElementById('approve-btn');
+    const reject = document.getElementById('reject-btn');
+
+    async function review(status){
+      const notes = document.getElementById('admin-notes')?.value || '';
+      const communityLink = document.getElementById('community-link')?.value || '';
+
+      if(status === 'approved' && !communityLink.trim()){
+        alert('Enter the community invite link before approving this applicant.');
+        return;
+      }
+
+      const action = status === 'approved' ? 'approve' : 'reject';
+
+      if(!confirm(`Are you sure you want to ${action} this application?`)){
+        return;
+      }
+
+      try{
+        const response = await fetch(`/api/admin/team-up/${Number(app.id)}`,{
+          method:'PATCH',
+          credentials:'same-origin',
+          headers:{
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify({
+            status,
+            admin_notes:notes,
+            community_link:communityLink
+          })
+        });
+
+        const data = await response.json();
+
+        if(response.status === 401){
+          window.location.href='/admin/login';
+          return;
+        }
+
+        if(!response.ok){
+          throw new Error(data.error || 'Unable to update application');
+        }
+
+        const index = applications.findIndex(item => Number(item.id) === Number(app.id));
+
+        if(index !== -1){
+          applications[index] = data.application;
+        }
+
+        render();
+        const updated = applications.find(item => Number(item.id) === Number(app.id));
+
+        if(updated){
+          showDetails(updated);
+        }
+
+        alert(`Application ${status}.`);
+
+      }catch(error){
+        console.error(error);
+        alert(error.message || 'Unable to update application.');
+      }
+    }
+
+    if(approve){
+      approve.addEventListener('click',() => review('approved'));
+    }
+
+    if(reject){
+      reject.addEventListener('click',() => review('rejected'));
+    }
   }
 
   function render(){

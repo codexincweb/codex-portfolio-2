@@ -253,6 +253,51 @@ app.post('/api/team-up/apply',resumeUpload.single('resume'),async(req,res)=>{
 });
 
 
+
+app.patch('/api/admin/team-up/:id',admin,async(req,res)=>{
+  try{
+    const id = Number(req.params.id);
+    const {status,admin_notes,community_link} = req.body || {};
+
+    if(!Number.isInteger(id) || id < 1){
+      return res.status(400).json({error:'Invalid application ID'});
+    }
+
+    if(!['approved','rejected'].includes(status)){
+      return res.status(400).json({error:'Status must be approved or rejected'});
+    }
+
+    const result = await pool.query(
+      `UPDATE team_up_applications
+       SET status=$1,
+           admin_notes=$2,
+           community_link=$3,
+           reviewed_at=NOW()
+       WHERE id=$4
+       RETURNING *`,
+      [
+        status,
+        admin_notes ? String(admin_notes).trim() : null,
+        community_link ? String(community_link).trim() : null,
+        id
+      ]
+    );
+
+    if(!result.rows.length){
+      return res.status(404).json({error:'Application not found'});
+    }
+
+    return res.json({
+      success:true,
+      application:result.rows[0]
+    });
+
+  }catch(error){
+    console.error('Team Up review error:',error);
+    return res.status(500).json({error:'Unable to update application'});
+  }
+});
+
 app.get('/api/admin/team-up',admin,async(req,res)=>{
   try{
     const result=await query(
