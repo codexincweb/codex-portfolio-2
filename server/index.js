@@ -409,20 +409,6 @@ app.get('/api/admin/team-up',admin,async(req,res)=>{
   }
 });
 
-app.get('/api/smtp-test',admin,async(req,res)=>{
-  try{
-    await mailer.verify();
-    res.json({ok:true,smtp:'connected'});
-  }catch(error){
-    console.error('SMTP test error:',error);
-    res.status(500).json({
-      ok:false,
-      smtp:'failed',
-      error:error.message
-    });
-  }
-});
-
 app.get('/api/health',async(req,res)=>{
   try{
     await query('SELECT 1');
