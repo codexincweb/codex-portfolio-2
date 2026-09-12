@@ -105,6 +105,30 @@ async function deleteFromCloudinary(publicId){
   }
 }
 
+async function deleteResumeFromCloudinary(publicId){
+  if(!publicId)return true;
+
+  try{
+    const result=await cloudinary.uploader.destroy(
+      publicId,
+      {
+        resource_type:'raw',
+        invalidate:true
+      }
+    );
+
+    if(result.result==='ok' || result.result==='not found'){
+      return true;
+    }
+
+    console.error('Cloudinary resume delete failed:',result);
+    return false;
+  }catch(error){
+    console.error('Cloudinary resume delete error:',error.message);
+    return false;
+  }
+}
+
 app.set('trust proxy',1);
 app.use(express.json({limit:'1mb'}));
 app.use(express.urlencoded({extended:true}));
@@ -368,6 +392,58 @@ app.patch('/api/admin/team-up/:id',admin,async(req,res)=>{
   }catch(error){
     console.error('Team Up review error:',error);
     return res.status(500).json({error:'Unable to update application'});
+  }
+});
+
+app.delete('/api/admin/team-up/:id',admin,async(req,res)=>{
+  try{
+    const id=Number(req.params.id);
+
+    if(!Number.isInteger(id) || id<1){
+      return res.status(400).json({error:'Invalid application ID'});
+    }
+
+    const current=await query(
+      `SELECT id,status,resume_public_id
+       FROM team_up_applications
+       WHERE id=$1
+       LIMIT 1`,
+      [id]
+    );
+
+    if(!current.rowCount){
+      return res.status(404).json({error:'Application not found'});
+    }
+
+    const application=current.rows[0];
+
+    if(application.status==='pending'){
+      return res.status(400).json({
+        error:'Pending applications must be reviewed before deletion'
+      });
+    }
+
+    if(application.resume_public_id){
+      const resumeDeleted=await deleteResumeFromCloudinary(
+        application.resume_public_id
+      );
+
+      if(!resumeDeleted){
+        return res.status(500).json({
+          error:'Unable to remove the uploaded resume. The application was not deleted.'
+        });
+      }
+    }
+
+    await query(
+      'DELETE FROM team_up_applications WHERE id=$1',
+      [id]
+    );
+
+    res.json({ok:true});
+  }catch(error){
+    console.error('Team Up delete error:',error);
+    res.status(500).json({error:'Unable to delete application'});
   }
 });
 

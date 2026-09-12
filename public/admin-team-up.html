@@ -440,12 +440,19 @@
           <div style="margin-top:22px;padding:12px 14px;border-radius:10px;background:var(--surface-soft);color:var(--muted)">
             This application has already been ${esc(app.status)}.
           </div>
+
+          <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn" type="button" id="delete-application-btn" style="color:var(--danger);border-color:#f1b8b2">
+              Delete Application
+            </button>
+          </div>
         `
       }
     `;
 
     const approve = document.getElementById('approve-btn');
     const reject = document.getElementById('reject-btn');
+    const deleteApplication = document.getElementById('delete-application-btn');
 
     async function review(status){
       const notes = document.getElementById('admin-notes')?.value || '';
@@ -514,6 +521,56 @@
 
     if(reject){
       reject.addEventListener('click',() => review('rejected'));
+    }
+
+    if(deleteApplication){
+      deleteApplication.addEventListener('click',async() => {
+        const confirmed=confirm(
+          `Delete ${app.full_name}'s ${app.status} application?\n\n` +
+          'This will permanently remove the application and its uploaded resume.'
+        );
+
+        if(!confirmed){
+          return;
+        }
+
+        deleteApplication.disabled=true;
+        deleteApplication.textContent='Deleting...';
+
+        try{
+          const response=await fetch(
+            `/api/admin/team-up/${Number(app.id)}`,
+            {
+              method:'DELETE',
+              credentials:'same-origin'
+            }
+          );
+
+          const data=await response.json();
+
+          if(response.status===401){
+            window.location.href='/admin/login';
+            return;
+          }
+
+          if(!response.ok){
+            throw new Error(data.error || 'Unable to delete application');
+          }
+
+          applications=applications.filter(
+            item=>Number(item.id)!==Number(app.id)
+          );
+
+          render();
+          alert('Application deleted successfully.');
+
+        }catch(error){
+          console.error(error);
+          deleteApplication.disabled=false;
+          deleteApplication.textContent='Delete Application';
+          alert(error.message || 'Unable to delete application.');
+        }
+      });
     }
   }
 
