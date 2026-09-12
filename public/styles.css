@@ -1092,13 +1092,18 @@ html.page-loading body{
   border: 0;
   border-radius: 999px;
   padding: 12px 19px;
-  background: currentColor;
-  color: Canvas;
+  background: #111827;
+  color: #ffffff;
   font: inherit;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition: opacity .2s ease, transform .2s ease;
+}
+
+html.dark #comment-submit {
+  background: #ffffff;
+  color: #111827;
 }
 
 #comment-submit:hover {

@@ -871,11 +871,11 @@ app.delete('/api/admin/works/:id',admin,async(req,res)=>{
     return res.status(404).json({error:'Not found'});
   }
 
-  await query('DELETE FROM works WHERE id=$1',[req.params.id]);
-
   if(current.rows[0].image_public_id){
     await deleteFromCloudinary(current.rows[0].image_public_id);
   }
+
+  await query('DELETE FROM works WHERE id=$1',[req.params.id]);
 
   res.json({ok:true});
 });
@@ -1142,16 +1142,16 @@ app.delete('/api/admin/updates/:id',admin,async(req,res)=>{
       return res.status(404).json({error:'Update not found'});
     }
 
-    await query(
-      'DELETE FROM updates WHERE id=$1',
-      [req.params.id]
-    );
-
     if(current.rows[0].cover_image_public_id){
       await deleteFromCloudinary(
         current.rows[0].cover_image_public_id
       );
     }
+
+    await query(
+      'DELETE FROM updates WHERE id=$1',
+      [req.params.id]
+    );
 
     res.json({ok:true});
   }catch(error){
