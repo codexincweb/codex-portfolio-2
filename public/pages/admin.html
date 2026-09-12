@@ -1,4 +1,83 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin CMS — Codex Inc</title><link rel="stylesheet" href="/styles.css"></head><body class="admin-shell"><div class="wrap"><div class="topline"><div><div class="eyebrow">Private CMS</div><h1 style="font-size:42px;margin:4px 0">Codex Inc Dashboard</h1><p class="muted">Manage the About Me profile and every project without editing source code.</p></div><div><a class="btn" href="/" target="_blank">View site</a> <button class="btn" id="logout">Log out</button></div></div><div id="msg"></div><div class="admin-grid"><section class="form"><h2 style="font-size:28px">About Me profile</h2><form id="profile"><label>Name</label><input name="name"><label>Professional title</label><input name="title"><label>Location</label><input name="location"><label>Bio</label><textarea name="bio"></textarea><label>Profile picture</label><input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"><p class="muted">Upload a new picture anytime. It will appear automatically on the About Me page.</p><button class="btn primary" style="margin-top:10px">Save profile</button></form></section><section class="form"><h2 style="font-size:28px">Project editor</h2><form id="work"><input type="hidden" name="id"><label>Slug</label><input name="slug" required><label>Title</label><input name="title" required><label>Category</label><input name="category"><label>Summary</label><textarea name="summary" required></textarea><label>Full description</label><textarea name="description"></textarea><label>Technology (comma separated)</label><input name="tech"><label>Live URL</label><input name="live_url" type="url"><label>Repository URL</label><input name="repo_url" type="url"><label>Project image</label><input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"><label><input name="featured" type="checkbox"> Featured project</label><div class="actions"><button class="btn primary" id="saveWork">Add project</button><button class="btn" type="button" id="cancelEdit" style="display:none">Cancel edit</button></div></form></section></div><section class="form" style="margin-top:20px"><div class="topline"><div><h2 style="font-size:28px;margin:0">Projects</h2><p class="muted">Edit, feature or remove projects from the public Works page.</p></div></div><div id="projects"></div></section></div><script>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin CMS — Codex Inc</title><link rel="stylesheet" href="/styles.css"></head><body class="admin-shell"><div class="wrap"><div class="topline"><div><div class="eyebrow">Private CMS</div><h1 style="font-size:42px;margin:4px 0">Codex Inc Dashboard</h1><p class="muted">Manage the About Me profile and every project without editing source code.</p></div><div><a class="btn" href="/" target="_blank">View site</a> <button class="btn" id="logout">Log out</button></div></div><div id="msg"></div><div class="admin-grid"><section class="form"><h2 style="font-size:28px">About Me profile</h2><form id="profile"><label>Name</label><input name="name"><label>Professional title</label><input name="title"><label>Location</label><input name="location"><label>Bio</label><textarea name="bio"></textarea><label>Profile picture</label><input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"><p class="muted">Upload a new picture anytime. It will appear automatically on the About Me page.</p><button class="btn primary" style="margin-top:10px">Save profile</button></form></section><section class="form"><h2 style="font-size:28px">Project editor</h2><form id="work"><input type="hidden" name="id"><label>Slug</label><input name="slug" required><label>Title</label><input name="title" required><label>Category</label><input name="category"><label>Summary</label><textarea name="summary" required></textarea><label>Full description</label><textarea name="description"></textarea><label>Technology (comma separated)</label><input name="tech"><label>Live URL</label><input name="live_url" type="url"><label>Repository URL</label><input name="repo_url" type="url"><label>Project image</label><input name="image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"><label><input name="featured" type="checkbox"> Featured project</label><div class="actions"><button class="btn primary" id="saveWork">Add project</button><button class="btn" type="button" id="cancelEdit" style="display:none">Cancel edit</button></div></form></section></div><section class="form" style="margin-top:20px"><div class="topline"><div><h2 style="font-size:28px;margin:0">Projects</h2><p class="muted">Edit, feature or remove projects from the public Works page.</p></div></div><div id="projects"></div></section></div>
+<section class="form" id="updates-cms" style="margin-top:20px">
+  <div class="topline">
+    <div>
+      <div class="eyebrow">Editorial CMS</div>
+      <h2 style="font-size:28px;margin:0">Updates</h2>
+      <p class="muted">Publish announcements, milestones, product updates and stories.</p>
+    </div>
+  </div>
+
+  <div id="updates-msg"></div>
+
+  <form id="update-form">
+    <input type="hidden" name="id">
+
+    <label>Headline</label>
+    <input name="title" required maxlength="180" placeholder="Enter the update headline">
+
+    <label>Short description</label>
+    <textarea name="excerpt" maxlength="500" placeholder="A short description shown on the Updates page"></textarea>
+
+    <label>Category</label>
+    <input name="category" maxlength="80" placeholder="Announcement, Milestone, Product Update...">
+
+    <label>Author</label>
+    <input name="author" value="Codex Inc" maxlength="100">
+
+    <label>Full article</label>
+    <textarea name="content" required rows="14" placeholder="Write the full article here..."></textarea>
+
+    <label>Cover image</label>
+    <input name="cover_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml">
+    <p class="muted">Optional. Maximum 5 MB.</p>
+
+    <label>Publication date</label>
+    <input name="published_at" type="datetime-local">
+
+    <label>
+      <input name="featured" type="checkbox">
+      Featured update
+    </label>
+
+    <label>Status</label>
+    <select name="status">
+      <option value="draft">Draft</option>
+      <option value="published">Published</option>
+    </select>
+
+    <div class="actions" style="margin-top:14px">
+      <button class="btn primary" id="save-update" type="submit">Create update</button>
+      <button class="btn" id="cancel-update" type="button" style="display:none">Cancel edit</button>
+    </div>
+  </form>
+</section>
+
+<section class="form" style="margin-top:20px">
+  <div class="topline">
+    <div>
+      <h2 style="font-size:28px;margin:0">Published & Draft Updates</h2>
+      <p class="muted">Manage your editorial content.</p>
+    </div>
+  </div>
+  <div id="updates-list">
+    <p class="muted">Loading updates...</p>
+  </div>
+</section>
+
+<section class="form" style="margin-top:20px">
+  <div class="topline">
+    <div>
+      <h2 style="font-size:28px;margin:0">Comments</h2>
+      <p class="muted">Review and moderate comments submitted by visitors.</p>
+    </div>
+  </div>
+  <div id="comments-list">
+    <p class="muted">Loading comments...</p>
+  </div>
+</section>
+
+<script>
 const msg=document.getElementById('msg'),profile=document.getElementById('profile'),work=document.getElementById('work'),projects=document.getElementById('projects');
 const api=async(u,o)=>{const r=await fetch(u,o);const d=await r.json().catch(()=>({}));if(r.status===401){location='/admin/login';throw Error('Unauthorized')}if(!r.ok)throw Error(d.error||'Request failed');return d};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -9,4 +88,209 @@ window.edit=id=>{const x=window.__works.find(a=>a.id===id);if(!x)return;for(cons
 document.getElementById('cancelEdit').onclick=()=>{work.reset();work.elements.id.value='';document.getElementById('saveWork').textContent='Add project';document.getElementById('cancelEdit').style.display='none'};
 window.del=async id=>{if(confirm('Delete this project permanently?')){await api('/api/admin/works/'+id,{method:'DELETE'});await refresh();msg.innerHTML='<div class="notice">Project deleted.</div>'}};
 logout.onclick=async()=>{await fetch('/api/admin/logout',{method:'POST'});location='/admin/login'};refresh().catch(()=>location='/admin/login');
+
+const updateForm=document.getElementById('update-form');
+const updatesList=document.getElementById('updates-list');
+const commentsList=document.getElementById('comments-list');
+const updatesMsg=document.getElementById('updates-msg');
+const saveUpdate=document.getElementById('save-update');
+const cancelUpdate=document.getElementById('cancel-update');
+
+let adminUpdates=[];
+let adminComments=[];
+
+const updateMessage=(message,danger=false)=>{
+  updatesMsg.innerHTML=`<div class="notice${danger?' danger':''}">${esc(message)}</div>`;
+};
+
+async function refreshUpdates(){
+  adminUpdates=await api('/api/admin/updates');
+
+  if(!adminUpdates.length){
+    updatesList.innerHTML='<p class="muted">No updates yet. Create your first update above.</p>';
+    return;
+  }
+
+  updatesList.innerHTML=adminUpdates.map(item=>`
+    <div class="admin-project">
+      <div>
+        ${item.cover_image_url?`<img class="admin-thumb" src="${esc(item.cover_image_url)}" alt="">`:''}
+      </div>
+      <div style="flex:1">
+        <strong>${esc(item.title)}</strong>
+        <div class="muted">
+          ${esc(item.category||'Uncategorized')}
+          · ${esc(item.status)}
+          ${item.featured?' · Featured':''}
+          · ${Number(item.view_count||0)} views
+        </div>
+        <div class="muted">${esc(item.excerpt||'No description')}</div>
+      </div>
+      <div>
+        <button class="btn" type="button" onclick="editUpdate(${item.id})">Edit</button>
+        <button class="btn danger" type="button" onclick="deleteUpdate(${item.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function refreshComments(){
+  adminComments=await api('/api/admin/comments');
+
+  if(!adminComments.length){
+    commentsList.innerHTML='<p class="muted">No comments yet.</p>';
+    return;
+  }
+
+  commentsList.innerHTML=adminComments.map(item=>`
+    <div class="admin-project">
+      <div style="flex:1">
+        <strong>${esc(item.name)}</strong>
+        <div class="muted">${esc(item.email)}</div>
+        <div class="muted">Article: ${esc(item.update_title)}</div>
+        <p style="margin:8px 0">${esc(item.comment)}</p>
+        <div class="muted">Status: ${esc(item.status)}</div>
+      </div>
+      <div>
+        ${item.status!=='approved'?`<button class="btn" type="button" onclick="setCommentStatus(${item.id},'approved')">Approve</button>`:''}
+        ${item.status!=='hidden'?`<button class="btn" type="button" onclick="setCommentStatus(${item.id},'hidden')">Hide</button>`:''}
+        ${item.status!=='pending'?`<button class="btn" type="button" onclick="setCommentStatus(${item.id},'pending')">Pending</button>`:''}
+        <button class="btn danger" type="button" onclick="deleteComment(${item.id})">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.editUpdate=id=>{
+  const item=adminUpdates.find(x=>Number(x.id)===Number(id));
+  if(!item)return;
+
+  updateForm.elements.id.value=item.id;
+  updateForm.elements.title.value=item.title||'';
+  updateForm.elements.excerpt.value=item.excerpt||'';
+  updateForm.elements.category.value=item.category||'';
+  updateForm.elements.author.value=item.author||'Codex Inc';
+  updateForm.elements.content.value=item.content||'';
+  updateForm.elements.featured.checked=!!item.featured;
+  updateForm.elements.status.value=item.status||'draft';
+
+  if(item.published_at){
+    const date=new Date(item.published_at);
+    const local=new Date(date.getTime()-date.getTimezoneOffset()*60000);
+    updateForm.elements.published_at.value=local.toISOString().slice(0,16);
+  }else{
+    updateForm.elements.published_at.value='';
+  }
+
+  saveUpdate.textContent='Update article';
+  cancelUpdate.style.display='inline-flex';
+
+  document.getElementById('updates-cms').scrollIntoView({
+    behavior:'smooth',
+    block:'start'
+  });
+};
+
+cancelUpdate.onclick=()=>{
+  updateForm.reset();
+  updateForm.elements.id.value='';
+  updateForm.elements.author.value='Codex Inc';
+  updateForm.elements.status.value='draft';
+  saveUpdate.textContent='Create update';
+  cancelUpdate.style.display='none';
+  updatesMsg.innerHTML='';
+};
+
+updateForm.onsubmit=async e=>{
+  e.preventDefault();
+
+  try{
+    const id=updateForm.elements.id.value;
+    const fd=new FormData(updateForm);
+
+    const url=id
+      ? `/api/admin/updates/${id}`
+      : '/api/admin/updates';
+
+    const method=id?'PUT':'POST';
+
+    await api(url,{
+      method,
+      body:fd
+    });
+
+    updateForm.reset();
+    updateForm.elements.id.value='';
+    updateForm.elements.author.value='Codex Inc';
+    updateForm.elements.status.value='draft';
+
+    saveUpdate.textContent='Create update';
+    cancelUpdate.style.display='none';
+
+    updateMessage(id?'Update saved successfully.':'Update created successfully.');
+
+    await refreshUpdates();
+  }catch(error){
+    updateMessage(error.message||'Unable to save update.',true);
+  }
+};
+
+window.deleteUpdate=async id=>{
+  const item=adminUpdates.find(x=>Number(x.id)===Number(id));
+
+  if(!item)return;
+
+  if(!confirm(`Delete "${item.title}" permanently?`))return;
+
+  try{
+    await api(`/api/admin/updates/${id}`,{
+      method:'DELETE'
+    });
+
+    await refreshUpdates();
+    updateMessage('Update deleted successfully.');
+  }catch(error){
+    updateMessage(error.message||'Unable to delete update.',true);
+  }
+};
+
+window.setCommentStatus=async(id,status)=>{
+  try{
+    await api(`/api/admin/comments/${id}`,{
+      method:'PATCH',
+      headers:{
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({status})
+    });
+
+    await refreshComments();
+  }catch(error){
+    updatesMsg.innerHTML=`<div class="notice danger">${esc(error.message||'Unable to update comment.')}</div>`;
+  }
+};
+
+window.deleteComment=async id=>{
+  if(!confirm('Delete this comment permanently?'))return;
+
+  try{
+    await api(`/api/admin/comments/${id}`,{
+      method:'DELETE'
+    });
+
+    await refreshComments();
+  }catch(error){
+    updatesMsg.innerHTML=`<div class="notice danger">${esc(error.message||'Unable to delete comment.')}</div>`;
+  }
+};
+
+Promise.all([
+  refreshUpdates(),
+  refreshComments()
+]).catch(error=>{
+  console.error(error);
+  updatesList.innerHTML='<p class="muted">Unable to load updates.</p>';
+  commentsList.innerHTML='<p class="muted">Unable to load comments.</p>';
+});
+
 </script></body></html>

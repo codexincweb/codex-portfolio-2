@@ -409,6 +409,154 @@ app.get('/api/admin/team-up',admin,async(req,res)=>{
   }
 });
 
+
+// =========================================
+// Public Updates / News API
+// =========================================
+
+app.get('/api/updates',async(req,res)=>{
+  try{
+    const result=await query(`
+      SELECT
+        id,
+        slug,
+        title,
+        excerpt,
+        category,
+        cover_image_url,
+        author,
+        featured,
+        published_at,
+        view_count
+      FROM updates
+      WHERE status='published'
+      ORDER BY featured DESC, published_at DESC NULLS LAST, created_at DESC
+    `);
+
+    res.json(result.rows);
+  }catch(error){
+    console.error('Failed to load updates:',error);
+    res.status(500).json({error:'Unable to load updates'});
+  }
+});
+
+app.get('/api/updates/:slug',async(req,res)=>{
+  try{
+    const result=await query(`
+      SELECT
+        id,
+        slug,
+        title,
+        excerpt,
+        content,
+        category,
+        cover_image_url,
+        author,
+        featured,
+        published_at,
+        view_count,
+        created_at,
+        updated_at
+      FROM updates
+      WHERE slug=$1
+        AND status='published'
+      LIMIT 1
+    `,[req.params.slug]);
+
+    if(!result.rowCount){
+      return res.status(404).json({error:'Update not found'});
+    }
+
+    const update=result.rows[0];
+
+    await query(`
+      UPDATE updates
+      SET view_count=view_count+1
+      WHERE id=$1
+    `,[update.id]);
+
+    update.view_count+=1;
+
+    const comments=await query(`
+      SELECT
+        id,
+        name,
+        comment,
+        created_at
+      FROM update_comments
+      WHERE update_id=$1
+        AND status='approved'
+      ORDER BY created_at ASC
+    `,[update.id]);
+
+    res.json({
+      update,
+      comments:comments.rows
+    });
+  }catch(error){
+    console.error('Failed to load update:',error);
+    res.status(500).json({error:'Unable to load update'});
+  }
+});
+
+app.post('/api/updates/:id/comments',async(req,res)=>{
+  try{
+    const updateId=Number(req.params.id);
+    const name=String(req.body.name||'').trim();
+    const email=String(req.body.email||'').trim().toLowerCase();
+    const comment=String(req.body.comment||'').trim();
+
+    if(!Number.isInteger(updateId)||updateId<1){
+      return res.status(400).json({error:'Invalid update'});
+    }
+
+    if(name.length<2||name.length>80){
+      return res.status(400).json({
+        error:'Name must be between 2 and 80 characters'
+      });
+    }
+
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      return res.status(400).json({
+        error:'Enter a valid email address'
+      });
+    }
+
+    if(comment.length<2||comment.length>2000){
+      return res.status(400).json({
+        error:'Comment must be between 2 and 2000 characters'
+      });
+    }
+
+    const update=await query(`
+      SELECT id
+      FROM updates
+      WHERE id=$1
+        AND status='published'
+      LIMIT 1
+    `,[updateId]);
+
+    if(!update.rowCount){
+      return res.status(404).json({error:'Update not found'});
+    }
+
+    const result=await query(`
+      INSERT INTO update_comments
+      (update_id,name,email,comment,status)
+      VALUES ($1,$2,$3,$4,'pending')
+      RETURNING id,name,comment,created_at,status
+    `,[updateId,name,email,comment]);
+
+    res.status(201).json({
+      message:'Comment submitted for review.',
+      comment:result.rows[0]
+    });
+  }catch(error){
+    console.error('Failed to submit comment:',error);
+    res.status(500).json({error:'Unable to submit comment'});
+  }
+});
+
 app.get('/api/health',async(req,res)=>{
   try{
     await query('SELECT 1');
@@ -624,6 +772,367 @@ app.delete('/api/admin/works/:id',admin,async(req,res)=>{
 
   res.json({ok:true});
 });
+
+
+// =========================================
+// Admin Updates / Comments API
+// =========================================
+
+function makeUpdateSlug(title, currentId=null){
+  const base=String(title||'')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-+|-+$/g,'')
+    .slice(0,90);
+
+  return base || `update-${currentId||Date.now()}`;
+}
+
+async function createUniqueUpdateSlug(title,currentId=null){
+  const base=makeUpdateSlug(title,currentId);
+  let slug=base;
+  let counter=2;
+
+  while(true){
+    const result=await query(
+      `SELECT id FROM updates WHERE slug=$1 LIMIT 1`,
+      [slug]
+    );
+
+    if(!result.rowCount || Number(result.rows[0].id)===Number(currentId)){
+      return slug;
+    }
+
+    slug=`${base}-${counter++}`;
+  }
+}
+
+app.get('/api/admin/updates',admin,async(req,res)=>{
+  try{
+    const result=await query(`
+      SELECT
+        id,
+        slug,
+        title,
+        excerpt,
+        content,
+        category,
+        cover_image_url,
+        author,
+        featured,
+        status,
+        published_at,
+        view_count,
+        created_at,
+        updated_at
+      FROM updates
+      ORDER BY
+        CASE WHEN status='published' THEN 0 ELSE 1 END,
+        featured DESC,
+        published_at DESC NULLS LAST,
+        created_at DESC
+    `);
+
+    res.json(result.rows);
+  }catch(error){
+    console.error('Failed to load admin updates:',error);
+    res.status(500).json({error:'Unable to load updates'});
+  }
+});
+
+app.post('/api/admin/updates',admin,upload.single('cover_image'),async(req,res)=>{
+  try{
+    const {
+      title,
+      excerpt,
+      content,
+      category,
+      author,
+      featured,
+      status,
+      published_at
+    }=req.body;
+
+    if(!String(title||'').trim()){
+      return res.status(400).json({error:'Headline is required'});
+    }
+
+    if(!String(content||'').trim()){
+      return res.status(400).json({error:'Article content is required'});
+    }
+
+    const cleanStatus=status==='published'?'published':'draft';
+    const slug=await createUniqueUpdateSlug(title);
+
+    let coverImage=null;
+    let coverPublicId=null;
+
+    if(req.file){
+      const uploaded=await uploadToCloudinary(
+        req.file,
+        'codex-inc/updates'
+      );
+      coverImage=uploaded.url;
+      coverPublicId=uploaded.public_id;
+    }
+
+    const publishDate=cleanStatus==='published'
+      ? (published_at ? new Date(published_at) : new Date())
+      : null;
+
+    const result=await query(`
+      INSERT INTO updates
+      (
+        slug,
+        title,
+        excerpt,
+        content,
+        category,
+        cover_image_url,
+        cover_image_public_id,
+        author,
+        featured,
+        status,
+        published_at
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      RETURNING *
+    `,[
+      slug,
+      String(title).trim(),
+      String(excerpt||'').trim()||null,
+      String(content).trim(),
+      String(category||'').trim()||null,
+      coverImage,
+      coverPublicId,
+      String(author||'Codex Inc').trim()||'Codex Inc',
+      featured==='true',
+      cleanStatus,
+      publishDate
+    ]);
+
+    res.status(201).json({update:result.rows[0]});
+  }catch(error){
+    console.error('Failed to create update:',error);
+    res.status(500).json({error:'Unable to create update'});
+  }
+});
+
+app.put('/api/admin/updates/:id',admin,upload.single('cover_image'),async(req,res)=>{
+  try{
+    const {
+      title,
+      excerpt,
+      content,
+      category,
+      author,
+      featured,
+      status,
+      published_at
+    }=req.body;
+
+    const current=await query(`
+      SELECT *
+      FROM updates
+      WHERE id=$1
+      LIMIT 1
+    `,[req.params.id]);
+
+    if(!current.rowCount){
+      return res.status(404).json({error:'Update not found'});
+    }
+
+    const existing=current.rows[0];
+
+    if(!String(title||'').trim()){
+      return res.status(400).json({error:'Headline is required'});
+    }
+
+    if(!String(content||'').trim()){
+      return res.status(400).json({error:'Article content is required'});
+    }
+
+    const cleanStatus=status==='published'?'published':'draft';
+    const slug=await createUniqueUpdateSlug(title,existing.id);
+
+    let coverImage=existing.cover_image_url;
+    let coverPublicId=existing.cover_image_public_id;
+
+    if(req.file){
+      const uploaded=await uploadToCloudinary(
+        req.file,
+        'codex-inc/updates'
+      );
+
+      coverImage=uploaded.url;
+      coverPublicId=uploaded.public_id;
+
+      if(existing.cover_image_public_id){
+        await deleteFromCloudinary(existing.cover_image_public_id);
+      }
+    }
+
+    let publishDate=existing.published_at;
+
+    if(cleanStatus==='published'){
+      publishDate=published_at
+        ? new Date(published_at)
+        : (existing.published_at || new Date());
+    }else{
+      publishDate=null;
+    }
+
+    const result=await query(`
+      UPDATE updates
+      SET
+        slug=$1,
+        title=$2,
+        excerpt=$3,
+        content=$4,
+        category=$5,
+        cover_image_url=$6,
+        cover_image_public_id=$7,
+        author=$8,
+        featured=$9,
+        status=$10,
+        published_at=$11,
+        updated_at=now()
+      WHERE id=$12
+      RETURNING *
+    `,[
+      slug,
+      String(title).trim(),
+      String(excerpt||'').trim()||null,
+      String(content).trim(),
+      String(category||'').trim()||null,
+      coverImage,
+      coverPublicId,
+      String(author||'Codex Inc').trim()||'Codex Inc',
+      featured==='true',
+      cleanStatus,
+      publishDate,
+      existing.id
+    ]);
+
+    res.json({update:result.rows[0]});
+  }catch(error){
+    console.error('Failed to update update:',error);
+    res.status(500).json({error:'Unable to update update'});
+  }
+});
+
+app.delete('/api/admin/updates/:id',admin,async(req,res)=>{
+  try{
+    const current=await query(`
+      SELECT cover_image_public_id
+      FROM updates
+      WHERE id=$1
+      LIMIT 1
+    `,[req.params.id]);
+
+    if(!current.rowCount){
+      return res.status(404).json({error:'Update not found'});
+    }
+
+    await query(
+      'DELETE FROM updates WHERE id=$1',
+      [req.params.id]
+    );
+
+    if(current.rows[0].cover_image_public_id){
+      await deleteFromCloudinary(
+        current.rows[0].cover_image_public_id
+      );
+    }
+
+    res.json({ok:true});
+  }catch(error){
+    console.error('Failed to delete update:',error);
+    res.status(500).json({error:'Unable to delete update'});
+  }
+});
+
+app.get('/api/admin/comments',admin,async(req,res)=>{
+  try{
+    const result=await query(`
+      SELECT
+        c.id,
+        c.update_id,
+        c.name,
+        c.email,
+        c.comment,
+        c.status,
+        c.created_at,
+        c.updated_at,
+        u.title AS update_title,
+        u.slug AS update_slug
+      FROM update_comments c
+      INNER JOIN updates u ON u.id=c.update_id
+      ORDER BY c.created_at DESC
+    `);
+
+    res.json(result.rows);
+  }catch(error){
+    console.error('Failed to load admin comments:',error);
+    res.status(500).json({error:'Unable to load comments'});
+  }
+});
+
+app.patch('/api/admin/comments/:id',admin,async(req,res)=>{
+  try{
+    const status=String(req.body.status||'').trim();
+
+    if(!['pending','approved','hidden'].includes(status)){
+      return res.status(400).json({error:'Invalid comment status'});
+    }
+
+    const result=await query(`
+      UPDATE update_comments
+      SET
+        status=$1,
+        updated_at=now()
+      WHERE id=$2
+      RETURNING *
+    `,[status,req.params.id]);
+
+    if(!result.rowCount){
+      return res.status(404).json({error:'Comment not found'});
+    }
+
+    res.json({comment:result.rows[0]});
+  }catch(error){
+    console.error('Failed to update comment:',error);
+    res.status(500).json({error:'Unable to update comment'});
+  }
+});
+
+app.delete('/api/admin/comments/:id',admin,async(req,res)=>{
+  try{
+    const result=await query(`
+      DELETE FROM update_comments
+      WHERE id=$1
+      RETURNING id
+    `,[req.params.id]);
+
+    if(!result.rowCount){
+      return res.status(404).json({error:'Comment not found'});
+    }
+
+    res.json({ok:true});
+  }catch(error){
+    console.error('Failed to delete comment:',error);
+    res.status(500).json({error:'Unable to delete comment'});
+  }
+});
+
+app.get('/updates',(req,res)=>
+  res.sendFile(path.join(__dirname,'..','public','updates.html'))
+);
+
+app.get('/update/:slug',(req,res)=>
+  res.sendFile(path.join(__dirname,'..','public','update.html'))
+);
 
 app.get('/work/:slug',(req,res)=>
   res.sendFile(path.join(__dirname,'..','public','work.html'))

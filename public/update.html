@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Codex Inc update">
+  <title>Update — Codex Inc</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body class="update-article-page">
+
+  <header class="updates-header">
+    <div class="updates-header-inner">
+      <a href="/" class="updates-brand">Codex Inc</a>
+
+      <nav class="updates-nav" aria-label="Updates navigation">
+        <a href="/">Home</a>
+        <a href="/updates.html">Updates</a>
+        <a href="/works.html">Works</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="update-article-main">
+
+    <div id="article-loading" class="article-state">
+      Loading update...
+    </div>
+
+    <article id="article" hidden>
+
+      <header class="article-header">
+        <div id="article-category" class="article-category"></div>
+
+        <h1 id="article-title"></h1>
+
+        <p id="article-excerpt" class="article-excerpt"></p>
+
+        <div class="article-meta">
+          <span id="article-author"></span>
+          <span class="article-meta-separator">·</span>
+          <span id="article-date"></span>
+          <span class="article-meta-separator">·</span>
+          <span id="article-views"></span>
+        </div>
+      </header>
+
+      <div id="article-cover" class="article-cover" hidden></div>
+
+      <div id="article-content" class="article-content"></div>
+
+      <section class="article-comments" id="comments">
+
+        <div class="comments-heading">
+          <span>Discussion</span>
+          <h2>Comments</h2>
+        </div>
+
+        <div id="comments-list" class="comments-list"></div>
+
+        <form id="comment-form" class="comment-form">
+
+          <div class="comment-form-heading">
+            <h3>Leave a comment</h3>
+            <p>Your email will not be displayed publicly.</p>
+          </div>
+
+          <div class="comment-fields">
+
+            <label>
+              <span>Name</span>
+              <input
+                id="comment-name"
+                name="name"
+                type="text"
+                maxlength="80"
+                autocomplete="name"
+                required
+              >
+            </label>
+
+            <label>
+              <span>Email</span>
+              <input
+                id="comment-email"
+                name="email"
+                type="email"
+                maxlength="160"
+                autocomplete="email"
+                required
+              >
+            </label>
+
+          </div>
+
+          <label>
+            <span>Comment</span>
+            <textarea
+              id="comment-text"
+              name="comment"
+              rows="6"
+              maxlength="2000"
+              required
+            ></textarea>
+          </label>
+
+          <button type="submit" id="comment-submit">
+            Post comment
+          </button>
+
+          <p id="comment-message" class="comment-message" aria-live="polite"></p>
+
+        </form>
+
+      </section>
+
+    </article>
+
+    <div id="article-error" class="article-state" hidden>
+      <span>404</span>
+      <h1>Update not found.</h1>
+      <p>This update may have been removed or is not currently published.</p>
+      <a href="/updates.html">Back to updates</a>
+    </div>
+
+  </main>
+
+  <footer class="updates-footer">
+    <p>© <span id="year"></span> Codex Inc. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent=new Date().getFullYear();
+
+    function escapeHtml(value){
+      return String(value??'')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#039;');
+    }
+
+    function formatDate(value){
+      if(!value) return '';
+
+      return new Intl.DateTimeFormat('en-US',{
+        year:'numeric',
+        month:'long',
+        day:'numeric'
+      }).format(new Date(value));
+    }
+
+    function renderArticleContent(content){
+      const container=document.getElementById('article-content');
+
+      const paragraphs=String(content||'')
+        .trim()
+        .split(/\n\s*\n/)
+        .map(text=>text.trim())
+        .filter(Boolean);
+
+      container.innerHTML=paragraphs
+        .map(text=>`<p>${escapeHtml(text).replace(/\n/g,'<br>')}</p>`)
+        .join('');
+    }
+
+    function renderComments(comments){
+      const container=document.getElementById('comments-list');
+
+      if(!comments.length){
+        container.innerHTML=`
+          <div class="comments-empty">
+            No comments yet. Be the first to start the discussion.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML=comments.map(comment=>`
+        <article class="comment">
+          <div class="comment-author">${escapeHtml(comment.name)}</div>
+          <div class="comment-date">${escapeHtml(formatDate(comment.created_at))}</div>
+          <p>${escapeHtml(comment.comment)}</p>
+        </article>
+      `).join('');
+    }
+
+    function getSlug(){
+      const parts=window.location.pathname.split('/').filter(Boolean);
+      return parts[1]||'';
+    }
+
+    async function loadArticle(){
+      const slug=getSlug();
+
+      if(!slug){
+        showError();
+        return;
+      }
+
+      try{
+        const response=await fetch(
+          `/api/updates/${encodeURIComponent(slug)}`
+        );
+
+        if(!response.ok){
+          showError();
+          return;
+        }
+
+        const data=await response.json();
+        const update=data.update;
+
+        document.title=`${update.title} — Codex Inc`;
+
+        document.getElementById('article-category').textContent=
+          update.category||'Update';
+
+        document.getElementById('article-title').textContent=
+          update.title;
+
+        document.getElementById('article-excerpt').textContent=
+          update.excerpt||'';
+
+        document.getElementById('article-author').textContent=
+          update.author||'Codex Inc';
+
+        document.getElementById('article-date').textContent=
+          formatDate(update.published_at);
+
+        document.getElementById('article-views').textContent=
+          `${update.view_count} ${update.view_count===1?'view':'views'}`;
+
+        if(update.cover_image_url){
+          const cover=document.getElementById('article-cover');
+
+          cover.innerHTML=`
+            <img
+              src="${escapeHtml(update.cover_image_url)}"
+              alt="${escapeHtml(update.title)}"
+            >
+          `;
+
+          cover.hidden=false;
+        }
+
+        renderArticleContent(update.content);
+        renderComments(data.comments||[]);
+
+        document.getElementById('article-loading').hidden=true;
+        document.getElementById('article').hidden=false;
+
+      }catch(error){
+        console.error(error);
+        showError();
+      }
+    }
+
+    function showError(){
+      document.getElementById('article-loading').hidden=true;
+      document.getElementById('article-error').hidden=false;
+    }
+
+    document.getElementById('comment-form').addEventListener(
+      'submit',
+      async event=>{
+        event.preventDefault();
+
+        const button=document.getElementById('comment-submit');
+        const message=document.getElementById('comment-message');
+
+        const slug=getSlug();
+
+        button.disabled=true;
+        button.textContent='Submitting...';
+        message.textContent='';
+
+        try{
+
+          const articleResponse=await fetch(
+            `/api/updates/${encodeURIComponent(slug)}`
+          );
+
+          if(!articleResponse.ok){
+            throw new Error('Update not found');
+          }
+
+          const articleData=await articleResponse.json();
+
+          const response=await fetch(
+            `/api/updates/${articleData.update.slug === slug
+              ? articleData.update.id
+              : articleData.update.id}/comments`,
+            {
+              method:'POST',
+              headers:{
+                'Content-Type':'application/json'
+              },
+              body:JSON.stringify({
+                name:document.getElementById('comment-name').value.trim(),
+                email:document.getElementById('comment-email').value.trim(),
+                comment:document.getElementById('comment-text').value.trim()
+              })
+            }
+          );
+
+          const data=await response.json();
+
+          if(!response.ok){
+            throw new Error(data.error||'Unable to submit comment');
+          }
+
+          document.getElementById('comment-form').reset();
+
+          message.textContent=
+            'Your comment has been submitted and is awaiting review.';
+
+        }catch(error){
+          console.error(error);
+          message.textContent=error.message||'Unable to submit comment.';
+        }finally{
+          button.disabled=false;
+          button.textContent='Post comment';
+        }
+      }
+    );
+
+    loadArticle();
+  </script>
+
+</body>
+</html>

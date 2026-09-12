@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Latest updates, announcements, milestones and stories from Codex Inc.">
+  <title>Updates — Codex Inc</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body class="updates-page">
+
+  <header class="updates-header">
+    <div class="updates-header-inner">
+      <a href="/" class="updates-brand">Codex Inc</a>
+
+      <nav class="updates-nav" aria-label="Updates navigation">
+        <a href="/">Home</a>
+        <a href="/updates.html" class="active">Updates</a>
+        <a href="/works.html">Works</a>
+        <a href="/contact.html">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="updates-main">
+
+    <section class="updates-intro">
+      <p class="updates-kicker">CODEX INC / UPDATES</p>
+      <h1>Latest updates</h1>
+      <p class="updates-intro-text">
+        Announcements, milestones, product updates and stories from Codex Inc.
+      </p>
+    </section>
+
+    <section id="updates-feed" class="updates-feed" aria-live="polite">
+      <div class="updates-loading">
+        Loading updates...
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="updates-footer">
+    <p>© <span id="year"></span> Codex Inc. All rights reserved.</p>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent=new Date().getFullYear();
+
+    function escapeHtml(value){
+      return String(value??'')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#039;');
+    }
+
+    function formatDate(value){
+      if(!value) return '';
+
+      return new Intl.DateTimeFormat('en-US',{
+        year:'numeric',
+        month:'long',
+        day:'numeric'
+      }).format(new Date(value));
+    }
+
+    function articleCard(update){
+      const image=update.cover_image_url
+        ? `<img src="${escapeHtml(update.cover_image_url)}" alt="${escapeHtml(update.title)}">`
+        : `<div class="update-card-placeholder" aria-hidden="true"></div>`;
+
+      return `
+        <article class="update-card ${update.featured?'is-featured':''}">
+          <a href="/update/${encodeURIComponent(update.slug)}" class="update-card-link">
+            <div class="update-card-media">
+              ${image}
+            </div>
+
+            <div class="update-card-body">
+              <div class="update-card-meta">
+                ${update.category
+                  ? `<span class="update-category">${escapeHtml(update.category)}</span>`
+                  : ''}
+                <span>${escapeHtml(formatDate(update.published_at))}</span>
+              </div>
+
+              <h2>${escapeHtml(update.title)}</h2>
+
+              ${update.excerpt
+                ? `<p>${escapeHtml(update.excerpt)}</p>`
+                : ''}
+
+              <div class="update-card-byline">
+                ${escapeHtml(update.author||'Codex Inc')}
+              </div>
+            </div>
+          </a>
+        </article>
+      `;
+    }
+
+    async function loadUpdates(){
+      const feed=document.getElementById('updates-feed');
+
+      try{
+        const response=await fetch('/api/updates');
+
+        if(!response.ok){
+          throw new Error('Unable to load updates');
+        }
+
+        const updates=await response.json();
+
+        if(!updates.length){
+          feed.innerHTML=`
+            <div class="updates-empty">
+              <p class="updates-empty-label">No updates yet</p>
+              <h2>There is nothing published here yet.</h2>
+              <p>
+                New announcements, milestones and stories will appear here
+                when they are published.
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        const featured=updates.find(update=>update.featured);
+        const latest=updates.filter(update=>!featured || update.id!==featured.id);
+
+        let html='';
+
+        if(featured){
+          html+=`
+            <section class="updates-featured">
+              ${articleCard(featured)}
+            </section>
+          `;
+        }
+
+        if(latest.length){
+          html+=`
+            <section class="updates-latest">
+              <div class="updates-section-heading">
+                <span>Latest</span>
+                <h2>More from Codex Inc</h2>
+              </div>
+
+              <div class="updates-grid">
+                ${latest.map(articleCard).join('')}
+              </div>
+            </section>
+          `;
+        }
+
+        feed.innerHTML=html;
+
+      }catch(error){
+        console.error(error);
+
+        feed.innerHTML=`
+          <div class="updates-empty">
+            <p class="updates-empty-label">Unable to load</p>
+            <h2>Updates could not be loaded.</h2>
+            <p>Please try again later.</p>
+          </div>
+        `;
+      }
+    }
+
+    loadUpdates();
+  </script>
+
+</body>
+</html>

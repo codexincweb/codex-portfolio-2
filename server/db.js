@@ -104,6 +104,53 @@ async function initDb() {
     )
   `);
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS updates (
+      id serial PRIMARY KEY,
+      slug text UNIQUE NOT NULL,
+      title text NOT NULL,
+      excerpt text,
+      content text NOT NULL,
+      category text,
+      cover_image_url text,
+      cover_image_public_id text,
+      author text NOT NULL DEFAULT 'Codex Inc',
+      featured boolean DEFAULT false,
+      status text NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft','published')),
+      published_at timestamptz,
+      view_count integer NOT NULL DEFAULT 0,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS update_comments (
+      id serial PRIMARY KEY,
+      update_id integer NOT NULL
+        REFERENCES updates(id)
+        ON DELETE CASCADE,
+      name text NOT NULL,
+      email text NOT NULL,
+      comment text NOT NULL,
+      status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending','approved','hidden')),
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_updates_status_published
+    ON updates(status, published_at DESC)
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_update_comments_update_status
+    ON update_comments(update_id, status, created_at ASC)
+  `);
+
   const profile = await query(
     'SELECT id FROM profile WHERE id=1'
   );
