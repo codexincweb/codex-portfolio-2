@@ -93,8 +93,11 @@
                 ? `<p>${escapeHtml(update.excerpt)}</p>`
                 : ''}
 
-              <div class="update-card-byline">
-                ${escapeHtml(update.author||'Codex Inc')}
+              <div class="update-card-footer">
+                <div class="update-card-byline">
+                  ${escapeHtml(update.author||'Codex Inc')}
+                </div>
+                <span class="update-read-more">Read more →</span>
               </div>
             </div>
           </a>

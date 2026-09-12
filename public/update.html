@@ -51,6 +51,43 @@
 
       <div id="article-content" class="article-content"></div>
 
+      <section class="article-reactions" aria-label="Article reactions">
+        <div class="reaction-copy">
+          <span class="reaction-kicker">YOUR RESPONSE</span>
+          <strong>Was this update useful?</strong>
+        </div>
+
+        <div class="reaction-actions">
+          <button
+            type="button"
+            class="reaction-button reaction-like"
+            id="reaction-like"
+            aria-label="Like this update"
+            aria-pressed="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 10v10H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1h3Zm2 10V10l4.2-7.1A1.5 1.5 0 0 1 16 3.7V8h4.1a2 2 0 0 1 2 2.3l-1.1 7A3 3 0 0 1 18 20H9Z"/>
+            </svg>
+            <span>Like</span>
+            <strong id="reaction-likes">0</strong>
+          </button>
+
+          <button
+            type="button"
+            class="reaction-button reaction-dislike"
+            id="reaction-dislike"
+            aria-label="Dislike this update"
+            aria-pressed="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M17 14V4h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-3Zm-2-10v10l-4.2 7.1A1.5 1.5 0 0 1 8 20.3V16H3.9a2 2 0 0 1-2-2.3l1.1-7A3 3 0 0 1 6 4h9Z"/>
+            </svg>
+            <span>Dislike</span>
+            <strong id="reaction-dislikes">0</strong>
+          </button>
+        </div>
+      </section>
+
       <section class="article-comments" id="comments">
 
         <div class="comments-heading">
@@ -188,6 +225,84 @@
       `).join('');
     }
 
+    function renderReactions(reactions){
+      const likes=document.getElementById('reaction-likes');
+      const dislikes=document.getElementById('reaction-dislikes');
+      const likeButton=document.getElementById('reaction-like');
+      const dislikeButton=document.getElementById('reaction-dislike');
+
+      likes.textContent=String(reactions?.likes||0);
+      dislikes.textContent=String(reactions?.dislikes||0);
+
+      const current=reactions?.current||null;
+
+      likeButton.classList.toggle('is-active',current==='like');
+      dislikeButton.classList.toggle('is-active',current==='dislike');
+
+      likeButton.setAttribute(
+        'aria-pressed',
+        current==='like' ? 'true' : 'false'
+      );
+
+      dislikeButton.setAttribute(
+        'aria-pressed',
+        current==='dislike' ? 'true' : 'false'
+      );
+    }
+
+    async function sendReaction(reaction){
+      const likeButton=document.getElementById('reaction-like');
+      const dislikeButton=document.getElementById('reaction-dislike');
+      const slug=getSlug();
+
+      likeButton.disabled=true;
+      dislikeButton.disabled=true;
+
+      try{
+        const articleResponse=await fetch(
+          `/api/updates/${encodeURIComponent(slug)}`
+        );
+
+        if(!articleResponse.ok){
+          throw new Error('Update not found');
+        }
+
+        const articleData=await articleResponse.json();
+
+        const current=articleData.reactions?.current||null;
+
+        const nextReaction=current===reaction
+          ? 'none'
+          : reaction;
+
+        const response=await fetch(
+          `/api/updates/${articleData.update.id}/reaction`,
+          {
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json'
+            },
+            body:JSON.stringify({
+              reaction:nextReaction
+            })
+          }
+        );
+
+        const data=await response.json();
+
+        if(!response.ok){
+          throw new Error(data.error||'Unable to save reaction');
+        }
+
+        renderReactions(data);
+      }catch(error){
+        console.error(error);
+      }finally{
+        likeButton.disabled=false;
+        dislikeButton.disabled=false;
+      }
+    }
+
     function getSlug(){
       const parts=window.location.pathname.split('/').filter(Boolean);
       return parts[1]||'';
@@ -249,8 +364,10 @@
 
         renderArticleContent(update.content);
         renderComments(data.comments||[]);
+        renderReactions(data.reactions||{});
 
         document.getElementById('article-loading').hidden=true;
+        document.getElementById('article-error').hidden=true;
         document.getElementById('article').hidden=false;
 
       }catch(error){
@@ -261,6 +378,7 @@
 
     function showError(){
       document.getElementById('article-loading').hidden=true;
+      document.getElementById('article').hidden=true;
       document.getElementById('article-error').hidden=false;
     }
 
@@ -326,6 +444,16 @@
           button.textContent='Post comment';
         }
       }
+    );
+
+    document.getElementById('reaction-like').addEventListener(
+      'click',
+      ()=>sendReaction('like')
+    );
+
+    document.getElementById('reaction-dislike').addEventListener(
+      'click',
+      ()=>sendReaction('dislike')
     );
 
     loadArticle();

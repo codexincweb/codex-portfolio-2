@@ -151,6 +151,26 @@ async function initDb() {
     ON update_comments(update_id, status, created_at ASC)
   `);
 
+  await query(`
+    CREATE TABLE IF NOT EXISTS update_reactions (
+      id serial PRIMARY KEY,
+      update_id integer NOT NULL
+        REFERENCES updates(id)
+        ON DELETE CASCADE,
+      visitor_token text NOT NULL,
+      reaction text NOT NULL
+        CHECK (reaction IN ('like','dislike')),
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now(),
+      UNIQUE(update_id, visitor_token)
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_update_reactions_update
+    ON update_reactions(update_id)
+  `);
+
   const profile = await query(
     'SELECT id FROM profile WHERE id=1'
   );

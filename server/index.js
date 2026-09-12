@@ -1,6 +1,7 @@
 const path=require('path');
 const express=require('express');
 const session=require('express-session');
+const crypto=require('crypto');
 const pgSession=require('connect-pg-simple')(session);
 const multer=require('multer');
 const {v2:cloudinary}=require('cloudinary');
@@ -414,6 +415,15 @@ app.get('/api/admin/team-up',admin,async(req,res)=>{
 // Public Updates / News API
 // =========================================
 
+function getReactionVisitorToken(req){
+  if(!req.session.reactionVisitorToken){
+    req.session.reactionVisitorToken=crypto.randomBytes(24).toString('hex');
+  }
+
+  return req.session.reactionVisitorToken;
+}
+
+
 app.get('/api/updates',async(req,res)=>{
   try{
     const result=await query(`
@@ -489,13 +499,110 @@ app.get('/api/updates/:slug',async(req,res)=>{
       ORDER BY created_at ASC
     `,[update.id]);
 
+    const visitorToken=getReactionVisitorToken(req);
+
+    const reactions=await query(`
+      SELECT
+        COUNT(*) FILTER (WHERE reaction='like')::int AS likes,
+        COUNT(*) FILTER (WHERE reaction='dislike')::int AS dislikes
+      FROM update_reactions
+      WHERE update_id=$1
+    `,[update.id]);
+
+    const visitorReaction=await query(`
+      SELECT reaction
+      FROM update_reactions
+      WHERE update_id=$1
+        AND visitor_token=$2
+      LIMIT 1
+    `,[update.id,visitorToken]);
+
     res.json({
       update,
-      comments:comments.rows
+      comments:comments.rows,
+      reactions:{
+        likes:reactions.rows[0]?.likes||0,
+        dislikes:reactions.rows[0]?.dislikes||0,
+        current:visitorReaction.rows[0]?.reaction||null
+      }
     });
   }catch(error){
     console.error('Failed to load update:',error);
     res.status(500).json({error:'Unable to load update'});
+  }
+});
+
+app.post('/api/updates/:id/reaction',async(req,res)=>{
+  try{
+    const updateId=Number(req.params.id);
+    const requested=String(req.body.reaction||'').trim().toLowerCase();
+
+    if(!Number.isInteger(updateId)||updateId<1){
+      return res.status(400).json({error:'Invalid update'});
+    }
+
+    if(!['like','dislike','none'].includes(requested)){
+      return res.status(400).json({
+        error:'Reaction must be like, dislike or none'
+      });
+    }
+
+    const update=await query(`
+      SELECT id
+      FROM updates
+      WHERE id=$1
+        AND status='published'
+      LIMIT 1
+    `,[updateId]);
+
+    if(!update.rowCount){
+      return res.status(404).json({error:'Update not found'});
+    }
+
+    const visitorToken=getReactionVisitorToken(req);
+
+    if(requested==='none'){
+      await query(`
+        DELETE FROM update_reactions
+        WHERE update_id=$1
+          AND visitor_token=$2
+      `,[updateId,visitorToken]);
+    }else{
+      await query(`
+        INSERT INTO update_reactions
+          (update_id,visitor_token,reaction)
+        VALUES ($1,$2,$3)
+        ON CONFLICT (update_id,visitor_token)
+        DO UPDATE SET
+          reaction=EXCLUDED.reaction,
+          updated_at=now()
+      `,[updateId,visitorToken,requested]);
+    }
+
+    const counts=await query(`
+      SELECT
+        COUNT(*) FILTER (WHERE reaction='like')::int AS likes,
+        COUNT(*) FILTER (WHERE reaction='dislike')::int AS dislikes
+      FROM update_reactions
+      WHERE update_id=$1
+    `,[updateId]);
+
+    const current=await query(`
+      SELECT reaction
+      FROM update_reactions
+      WHERE update_id=$1
+        AND visitor_token=$2
+      LIMIT 1
+    `,[updateId,visitorToken]);
+
+    res.json({
+      likes:counts.rows[0]?.likes||0,
+      dislikes:counts.rows[0]?.dislikes||0,
+      current:current.rows[0]?.reaction||null
+    });
+  }catch(error){
+    console.error('Failed to save reaction:',error);
+    res.status(500).json({error:'Unable to save reaction'});
   }
 });
 
