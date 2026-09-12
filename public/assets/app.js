@@ -184,8 +184,165 @@ function shell(){document.querySelectorAll('[data-footer]').forEach(e=>e.innerHT
 async function api(url,opts){const r=await fetch(url,opts);const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d}
 function applyProfile(p){document.querySelectorAll('[data-name]').forEach(e=>e.textContent=p.name||'Codex Inc');document.querySelectorAll('[data-title]').forEach(e=>e.textContent=p.title||'Software Developer & Digital Product Builder');document.querySelectorAll('[data-bio]').forEach(e=>e.textContent=p.bio||'');document.querySelectorAll('[data-location]').forEach(e=>e.textContent=p.location||'');document.querySelectorAll('[data-profile-image]').forEach(e=>{if(p.image_url){e.src=p.image_url;e.classList.add('has-image');e.style.display='block';document.querySelectorAll('[data-profile-placeholder]').forEach(x=>x.style.display='none')}})}
 function card(x){return `<article class="card project-card"><a href="/work/${encodeURIComponent(x.slug)}"><img class="project-image" src="${esc(x.image_url||'/assets/placeholder.svg')}" alt="${esc(x.title)}" onerror="this.src='/assets/placeholder.svg'"></a><div class="eyebrow">${esc(x.category||'Project')}</div><h3>${esc(x.title)}</h3><p class="muted">${esc(x.summary)}</p><div class="tags">${(x.tech||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div><a class="text-link" href="/work/${encodeURIComponent(x.slug)}">View project →</a></article>`}
-async function load(){shell();try{const p=await api('/api/profile');applyProfile(p);const w=await api('/api/works');document.querySelectorAll('[data-works]').forEach(e=>e.innerHTML=w.map(card).join(''));}catch(e){console.error(e)}}
+async function load(){shell();try{const p=await api('/api/profile');applyProfile(p);const w=await api('/api/works');document.querySelectorAll('[data-works]').forEach(e=>e.innerHTML=w.map(card).join(''));window.refreshScrollReveal?.();}catch(e){console.error(e)}}
 load();
+
+/* =========================================
+   Premium page loading + scroll reveal
+   ========================================= */
+
+(function(){
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function createLoader(){
+    if(document.querySelector('.page-loader')) return;
+
+    const loader=document.createElement('div');
+    loader.className='page-loader';
+    loader.setAttribute('aria-hidden','true');
+    loader.innerHTML=`
+      <div class="page-loader-inner">
+        <div class="page-loader-brand"></div>
+        <div class="page-loader-line"></div>
+        <div class="page-loader-line short"></div>
+      </div>
+    `;
+
+    document.documentElement.classList.add('page-loading');
+    document.body.prepend(loader);
+
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        loader.classList.add('is-hidden');
+        document.documentElement.classList.remove('page-loading');
+
+        setTimeout(()=>{
+          loader.remove();
+        },400);
+      });
+    });
+  }
+
+  function setupScrollReveal(){
+    const elements=[
+      ...document.querySelectorAll(
+        'main h1, main h2, main h3, main p, main .eyebrow, main .text-link, main .project-image, main .profile-pic, main .profile-placeholder, main .contact-box, main .list-item'
+      )
+    ];
+
+    const cards=[
+      ...document.querySelectorAll(
+        'main .card, main .service-list > *, main .experience-list > *'
+      )
+    ];
+
+    elements.forEach(element=>{
+      if(
+        element.closest('.admin-shell') ||
+        element.closest('script') ||
+        element.classList.contains('reveal') ||
+        element.classList.contains('reveal-group')
+      ) return;
+
+      element.classList.add('reveal');
+    });
+
+    cards.forEach((card,index)=>{
+      card.classList.add('reveal');
+      card.style.setProperty('--reveal-delay',`${Math.min(index * 90,360)}ms`);
+    });
+
+    if(reduceMotion){
+      document.querySelectorAll('.reveal').forEach(element=>{
+        element.classList.add('is-visible');
+      });
+      return;
+    }
+
+    const observer=new IntersectionObserver((entries,obs)=>{
+      entries.forEach(entry=>{
+        if(!entry.isIntersecting) return;
+
+        entry.target.classList.add('is-visible');
+        obs.unobserve(entry.target);
+      });
+    },{
+      threshold:0.12,
+      rootMargin:'0px 0px -45px 0px'
+    });
+
+    document.querySelectorAll('.reveal').forEach(element=>{
+      observer.observe(element);
+    });
+
+    window.refreshScrollReveal=setupScrollReveal;
+  }
+
+  function setupPageTransitions(){
+    if(reduceMotion) return;
+
+    document.addEventListener('click',event=>{
+      const link=event.target.closest('a[href]');
+
+      if(!link) return;
+      if(link.target==='_blank') return;
+      if(link.hasAttribute('download')) return;
+
+      const href=link.getAttribute('href');
+
+      if(!href) return;
+      if(href.startsWith('#')) return;
+      if(href.startsWith('mailto:')) return;
+      if(href.startsWith('tel:')) return;
+      if(href.startsWith('javascript:')) return;
+
+      let url;
+
+      try{
+        url=new URL(href,window.location.href);
+      }catch{
+        return;
+      }
+
+      if(url.origin!==window.location.origin) return;
+      if(url.pathname===window.location.pathname && url.search===window.location.search) return;
+
+      event.preventDefault();
+
+      const loader=document.createElement('div');
+      loader.className='page-loader';
+      loader.setAttribute('aria-hidden','true');
+      loader.innerHTML=`
+        <div class="page-loader-inner">
+          <div class="page-loader-brand"></div>
+          <div class="page-loader-line"></div>
+          <div class="page-loader-line short"></div>
+        </div>
+      `;
+
+      document.documentElement.classList.add('page-loading');
+      document.body.prepend(loader);
+
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          window.location.href=url.href;
+        },120);
+      });
+    });
+  }
+
+  function initMotion(){
+    createLoader();
+    setupScrollReveal();
+    setupPageTransitions();
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',initMotion,{once:true});
+  }else{
+    initMotion();
+  }
+})();
 
 (function(){
   const form=document.querySelector('#team-up-form');
