@@ -409,3 +409,14 @@ load();
     }
   });
 })();
+
+/* Codex Inc AI Assistant */
+(function(){
+  if(document.querySelector('script[data-codex-chat]')) return;
+
+  const script=document.createElement('script');
+  script.src='/assets/chat-assistant.js';
+  script.defer=true;
+  script.dataset.codexChat='true';
+  document.head.appendChild(script);
+})();

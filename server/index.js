@@ -7,9 +7,11 @@ const multer=require('multer');
 const {v2:cloudinary}=require('cloudinary');
 const {pool,query,initDb}=require('./db');
 const nodemailer=require('nodemailer');
+const {GoogleGenAI}=require('@google/genai');
 require('dotenv').config();
 
 const app=express();
+const gemini=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
 const PORT=Number(process.env.PORT||3000);
 
 
@@ -157,6 +159,133 @@ if(process.env.NODE_ENV==='production'){
 }
 
 app.use(session(sessionConfig));
+
+const chatRateLimit = new Map();
+const CHAT_WINDOW_MS = 60 * 1000;
+const CHAT_MAX_REQUESTS = 10;
+
+function checkChatRateLimit(req){
+  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const ip = forwarded || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+
+  const current = chatRateLimit.get(ip);
+
+  if(!current || now - current.startedAt >= CHAT_WINDOW_MS){
+    chatRateLimit.set(ip,{startedAt:now,count:1});
+    return true;
+  }
+
+  if(current.count >= CHAT_MAX_REQUESTS){
+    return false;
+  }
+
+  current.count += 1;
+  return true;
+}
+
+app.post('/api/chat', async (req,res)=>{
+  if(!checkChatRateLimit(req)){
+    return res.status(429).json({error:'Too many chat requests. Please try again in a minute.'});
+  }
+
+  try{
+    const message=String(req.body?.message||'').trim();
+
+    if(!message){
+      return res.status(400).json({error:'Message is required'});
+    }
+
+    if(message.length>1000){
+      return res.status(400).json({error:'Message is too long'});
+    }
+
+    const [worksResult,updatesResult]=await Promise.all([
+      query(`
+        SELECT slug,title,category,summary,description,tech,live_url,repo_url,featured
+        FROM works
+        ORDER BY featured DESC,created_at DESC
+      `),
+      query(`
+        SELECT slug,title,excerpt,content,category,author,featured,published_at
+        FROM updates
+        WHERE status='published'
+        ORDER BY published_at DESC NULLS LAST,created_at DESC
+      `)
+    ]);
+
+    const knowledge={
+      company:{
+        name:'Codex Inc',
+        description:'A technology brand focused on software development, digital products, APIs, web development, cybersecurity-related technology, and practical technology projects.',
+        owner:'Abubakar Ewenyi Abdulqudus, professionally known as Codex.',
+        website_pages:[
+          {path:'/index.html',purpose:'Home'},
+          {path:'/about.html',purpose:'About Codex Inc'},
+          {path:'/works.html',purpose:'Projects and work'},
+          {path:'/services.html',purpose:'Services'},
+          {path:'/experience.html',purpose:'Experience'},
+          {path:'/team-up.html',purpose:'Team Up and collaboration applications'},
+          {path:'/updates.html',purpose:'Latest updates and news'},
+          {path:'/contact.html',purpose:'Contact Codex Inc'}
+        ],
+        contact:{
+          email:'codexinc.web@gmail.com',
+          whatsapp:'+234 704 513 9075',
+          github:'https://github.com/codexincweb',
+          linkedin:'https://www.linkedin.com/in/codex-inc-146990412'
+        }
+      },
+      works:worksResult.rows,
+      updates:updatesResult.rows
+    };
+
+    const systemInstruction=`You are the official Codex Inc website assistant.
+
+Your job is to help visitors understand and navigate the entire public Codex Inc website.
+
+Use the live website knowledge supplied below as your source of truth.
+
+CORE RULES:
+- Answer naturally, professionally and concisely.
+- You know Codex Inc, its owner, public pages, projects, services, Team Up system, updates and contact information.
+- For project questions, use the live WORKS data.
+- For news/update questions, use the live PUBLISHED UPDATES data.
+- Newly published projects and updates will appear automatically in the knowledge supplied to you.
+- Never invent a project, service, update, technology, achievement, statistic, employee, client or other fact.
+- If information is not present in the supplied knowledge, say that you don't have that information.
+- Do not expose API keys, environment variables, database credentials, admin credentials, private records, server internals or security-sensitive implementation details.
+- You may explain public website features and direct visitors to the appropriate public page.
+- If someone asks who owns Codex Inc, identify Abubakar Ewenyi Abdulqudus (professionally known as Codex) as the owner/founder.
+- If someone asks how to contact Codex Inc, provide the public contact information below.
+- When useful, recommend the relevant page path.
+- Do not claim that you personally performed actions on the website.
+- Do not mention that you are reading a database unless the visitor specifically asks how your knowledge works.
+
+LIVE CODEX INC KNOWLEDGE:
+${JSON.stringify(knowledge,null,2)}
+`;
+
+    const response=await gemini.models.generateContent({
+      model:process.env.GEMINI_MODEL||'gemini-3.6-flash',
+      contents:message,
+      config:{
+        systemInstruction
+      }
+    });
+
+    const reply=String(response.text||'').trim();
+
+    if(!reply){
+      return res.status(502).json({error:'No response received from AI'});
+    }
+
+    res.json({reply});
+  }catch(error){
+    console.error('Chat API error:',error?.message||error);
+    res.status(500).json({error:'Unable to process your message right now'});
+  }
+});
 app.use(express.static(path.join(__dirname,'..','public')));
 
 const admin=(req,res,next)=>req.session?.admin?next():res.status(401).json({error:'Unauthorized'});
