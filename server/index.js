@@ -330,7 +330,10 @@ ${JSON.stringify(knowledge,null,2)}
     console.error('Codex chat error:',error);
 
     return res.status(500).json({
-      error:'Unable to process the chat request right now.'
+      error:'Chat diagnostic',
+      detail:String(error?.message || error),
+      status:error?.status || null,
+      code:error?.code || null
     });
   }
 });
