@@ -93,7 +93,7 @@
       <button
         class="codex-chat-launcher"
         type="button"
-        aria-label="Open Codex Inc Assistant"
+        aria-label="Open Codex Assistant"
         aria-expanded="false"
         aria-controls="codex-chat-panel"
       >
@@ -107,7 +107,7 @@
       <section
         id="codex-chat-panel"
         class="codex-chat-panel"
-        aria-label="Codex Inc Assistant"
+        aria-label="Codex Assistant"
         aria-hidden="true"
         hidden
       >
@@ -115,7 +115,7 @@
           <div class="codex-chat-brand">
             <div class="codex-chat-avatar" aria-hidden="true">C</div>
             <div>
-              <strong>Codex Inc Assistant</strong>
+              <strong>Codex Assistant</strong>
               <span><i></i> Available to help</span>
             </div>
           </div>

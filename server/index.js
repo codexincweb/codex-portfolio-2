@@ -216,8 +216,8 @@ app.post('/api/chat', async (req,res)=>{
 
     const knowledge={
       company:{
-        name:'Codex Inc',
-        description:'A technology brand focused on software development, digital products, APIs, web development, cybersecurity-related technology, and practical technology projects.',
+        name:'Codex',
+        description:'A personal technology portfolio showcasing software development, digital products, APIs, web development, cybersecurity-related technology, and practical technology projects.',
         owner:'Abubakar Ewenyi Abdulqudus, professionally known as Codex.',
         website_pages:[
           {path:'/index.html',purpose:'Home'},
@@ -227,7 +227,7 @@ app.post('/api/chat', async (req,res)=>{
           {path:'/experience.html',purpose:'Experience'},
           {path:'/team-up.html',purpose:'Team Up and collaboration applications'},
           {path:'/updates.html',purpose:'Latest updates and news'},
-          {path:'/contact.html',purpose:'Contact Codex Inc'}
+          {path:'/contact.html',purpose:'Contact Me'}
         ],
         contact:{
           email:'codexinc.web@gmail.com',
@@ -262,15 +262,15 @@ CORE RULES:
 - Do not mention that you are reading a database unless the visitor specifically asks how your knowledge works.
 
 NAVIGATION RULES:
-- When recommending an internal Codex Inc page, ALWAYS use a Markdown link with the exact internal path from the website_pages knowledge.
+- When recommending a page on this portfolio, ALWAYS use a Markdown link with the exact internal path from the website_pages knowledge.
 - Never display an internal page path such as /works.html, /services.html, /updates.html or /contact.html as raw text when you can provide a useful link.
 - Use clear human-friendly link labels.
 - Examples:
-  [View Projects](/works.html)
-  [Explore Services](/services.html)
-  [Explore Updates](/updates.html)
-  [Contact Codex Inc](/contact.html)
-  [Team Up with Codex Inc](/team-up.html)
+  [View My Projects](/works.html)
+  [View My Services](/services.html)
+  [View My Updates](/updates.html)
+  [Contact Me](/contact.html)
+  [Team Up with Me](/team-up.html)
 - Prefer one or two relevant navigation links rather than listing every page.
 - Do not invent internal URLs.
 - External public links such as GitHub, LinkedIn and WhatsApp may be provided when relevant.
