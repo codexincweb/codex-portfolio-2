@@ -186,11 +186,16 @@ function checkChatRateLimit(req){
 
 app.post('/api/chat', async (req,res)=>{
   if(!checkChatRateLimit(req)){
-    return res.status(429).json({error:'Too many chat requests. Please try again in a minute.'});
+    return res.status(429).json({
+      error:'Too many chat requests. Please try again in a minute.'
+    });
   }
 
   try{
     const message=String(req.body?.message||'').trim();
+    const history=Array.isArray(req.body?.history)
+      ? req.body.history
+      : [];
 
     if(!message){
       return res.status(400).json({error:'Message is required'});
@@ -199,6 +204,18 @@ app.post('/api/chat', async (req,res)=>{
     if(message.length>1000){
       return res.status(400).json({error:'Message is too long'});
     }
+
+    const safeHistory=history
+      .filter(item =>
+        item &&
+        (item.role==='user'||item.role==='assistant') &&
+        typeof item.content==='string'
+      )
+      .slice(-12)
+      .map(item=>({
+        role:item.role==='assistant' ? 'model' : 'user',
+        parts:[{text:item.content.slice(0,2000)}]
+      }));
 
     const [worksResult,updatesResult]=await Promise.all([
       query(`
@@ -215,13 +232,14 @@ app.post('/api/chat', async (req,res)=>{
     ]);
 
     const knowledge={
-      company:{
+      portfolio:{
         name:'Codex',
+        type:'Personal technology portfolio',
         description:'A personal technology portfolio showcasing software development, digital products, APIs, web development, cybersecurity-related technology, and practical technology projects.',
         owner:'Abubakar Ewenyi Abdulqudus, professionally known as Codex.',
         website_pages:[
           {path:'/index.html',purpose:'Home'},
-          {path:'/about.html',purpose:'About Codex Inc'},
+          {path:'/about.html',purpose:'About Codex'},
           {path:'/works.html',purpose:'Projects and work'},
           {path:'/services.html',purpose:'Services'},
           {path:'/experience.html',purpose:'Experience'},
@@ -240,30 +258,32 @@ app.post('/api/chat', async (req,res)=>{
       updates:updatesResult.rows
     };
 
-    const systemInstruction=`You are the official Codex Inc website assistant.
+    const systemInstruction=`You are the personal portfolio assistant for Codex.
 
-Your job is to help visitors understand and navigate the entire public Codex Inc website.
+You help visitors understand and navigate Codex's personal technology portfolio.
 
-Use the live website knowledge supplied below as your source of truth.
+This is NOT a company or organization website. Do not describe Codex as a company, organization, agency, team, or corporation.
 
 CORE RULES:
 - Answer naturally, professionally and concisely.
-- You know Codex Inc, its owner, public pages, projects, services, Team Up system, updates and contact information.
+- You know Codex's portfolio, projects, services, experience, Team Up system, updates and contact information.
+- Use the live portfolio knowledge supplied below as your source of truth.
 - For project questions, use the live WORKS data.
-- For news/update questions, use the live PUBLISHED UPDATES data.
-- Newly published projects and updates will appear automatically in the knowledge supplied to you.
+- For update/news questions, use the live PUBLISHED UPDATES data.
+- Newly published projects and updates automatically appear in the supplied knowledge.
 - Never invent a project, service, update, technology, achievement, statistic, employee, client or other fact.
 - If information is not present in the supplied knowledge, say that you don't have that information.
-- Do not expose API keys, environment variables, database credentials, admin credentials, private records, server internals or security-sensitive implementation details.
+- Never expose API keys, environment variables, database credentials, admin credentials, private records, server internals or security-sensitive implementation details.
 - You may explain public website features and direct visitors to the appropriate public page.
-- If someone asks who owns Codex Inc, identify Abubakar Ewenyi Abdulqudus (professionally known as Codex) as the owner/founder.
-- If someone asks how to contact Codex Inc, provide the public contact information below.
+- If someone asks who owns the portfolio, identify Abubakar Ewenyi Abdulqudus, professionally known as Codex.
+- If someone asks how to contact Codex, provide the public contact information below.
 - Do not claim that you personally performed actions on the website.
-- Do not mention that you are reading a database unless the visitor specifically asks how your knowledge works.
+- Do not mention databases or internal systems unless specifically asked how the assistant's public knowledge works.
+- Remember relevant information from earlier messages in the current conversation and use it when answering follow-up questions.
 
 NAVIGATION RULES:
-- When recommending a page on this portfolio, ALWAYS use a Markdown link with the exact internal path from the website_pages knowledge.
-- Never display an internal page path such as /works.html, /services.html, /updates.html or /contact.html as raw text when you can provide a useful link.
+- When recommending a page on this portfolio, ALWAYS use a Markdown link with the exact internal path from the portfolio knowledge.
+- Never display internal page paths such as /works.html or /team-up.html as raw text when a useful link can be provided.
 - Use clear human-friendly link labels.
 - Examples:
   [View My Projects](/works.html)
@@ -271,18 +291,26 @@ NAVIGATION RULES:
   [View My Updates](/updates.html)
   [Contact Me](/contact.html)
   [Team Up with Me](/team-up.html)
-- Prefer one or two relevant navigation links rather than listing every page.
+- Prefer one or two relevant navigation links instead of listing every page.
 - Do not invent internal URLs.
-- External public links such as GitHub, LinkedIn and WhatsApp may be provided when relevant.
+- External public links such as GitHub and LinkedIn may be provided when relevant.
 - Do not put navigation links inside code blocks.
 
-LIVE CODEX INC KNOWLEDGE:
+LIVE PORTFOLIO KNOWLEDGE:
 ${JSON.stringify(knowledge,null,2)}
 `;
 
+    const contents=[
+      ...safeHistory,
+      {
+        role:'user',
+        parts:[{text:message}]
+      }
+    ];
+
     const response=await gemini.models.generateContent({
       model:process.env.GEMINI_MODEL||'gemini-3.6-flash',
-      contents:message,
+      contents,
       config:{
         systemInstruction
       }
@@ -291,13 +319,19 @@ ${JSON.stringify(knowledge,null,2)}
     const reply=String(response.text||'').trim();
 
     if(!reply){
-      return res.status(502).json({error:'No response received from AI'});
+      return res.status(502).json({
+        error:'No response received from AI'
+      });
     }
 
-    res.json({reply});
+    return res.json({reply});
+
   }catch(error){
-    console.error('Chat API error:',error?.message||error);
-    res.status(500).json({error:'Unable to process your message right now'});
+    console.error('Codex chat error:',error);
+
+    return res.status(500).json({
+      error:'Unable to process the chat request right now.'
+    });
   }
 });
 app.use(express.static(path.join(__dirname,'..','public')));

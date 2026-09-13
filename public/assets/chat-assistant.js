@@ -306,13 +306,29 @@
     setTyping(true);
 
     try{
+      const history=state.messages
+        .slice(-12)
+        .filter(item =>
+          item &&
+          (item.role==='user'||item.role==='assistant') &&
+          typeof item.text==='string'
+        )
+        .slice(0,-1)
+        .map(item=>({
+          role:item.role,
+          content:item.text
+        }));
+
       const response=await fetch('/api/chat',{
         method:'POST',
         headers:{
           'Content-Type':'application/json',
           'Accept':'application/json'
         },
-        body:JSON.stringify({message})
+        body:JSON.stringify({
+          message,
+          history
+        })
       });
 
       const raw=await response.text();
