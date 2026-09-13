@@ -213,8 +213,8 @@ app.post('/api/chat', async (req,res)=>{
       )
       .slice(-12)
       .map(item=>({
-        role:item.role==='assistant' ? 'model' : 'user',
-        parts:[{text:item.content.slice(0,2000)}]
+        role:item.role,
+        content:item.content.slice(0,2000)
       }));
 
     const [worksResult,updatesResult]=await Promise.all([
