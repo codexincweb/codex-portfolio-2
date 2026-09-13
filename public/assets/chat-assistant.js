@@ -293,10 +293,10 @@
 
   async function sendMessage(){
     const input=document.querySelector('.codex-chat-input');
-    if(!input||state.sending) return;
+    if(!input) return;
 
     const message=input.value.trim();
-    if(!message) return;
+    if(!message||state.sending) return;
 
     state.sending=true;
     input.value='';
@@ -308,41 +308,55 @@
     try{
       const response=await fetch('/api/chat',{
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{
+          'Content-Type':'application/json',
+          'Accept':'application/json'
+        },
         body:JSON.stringify({message})
       });
 
       const raw=await response.text();
+
       let data={};
 
-      try{
-        data=raw?JSON.parse(raw):{};
-      }catch(parseError){
-        console.error('Codex chat invalid JSON:',raw,parseError);
-        throw new Error('The server returned an invalid response');
+      if(raw){
+        try{
+          data=JSON.parse(raw);
+        }catch(parseError){
+          console.error('Codex Assistant JSON error:',parseError,raw);
+        }
       }
-
-      console.log('Codex chat response:',response.status,data);
 
       if(!response.ok){
-        throw new Error(data.error||'Unable to get a response');
+        throw new Error(
+          data.error ||
+          `Server returned HTTP ${response.status}`
+        );
       }
 
-      setTyping(false);
-      addMessage(
-        'assistant',
-        String(data.reply||'I’m unable to answer that right now.')
-      );
+      const reply=
+        typeof data.reply==='string' && data.reply.trim()
+          ? data.reply.trim()
+          : 'I’m unable to answer that right now.';
+
+      addMessage('assistant',reply);
+
     }catch(error){
-      setTyping(false);
+      console.error('Codex Assistant request error:',error);
+
       addMessage(
         'assistant',
-        'Sorry, I couldn’t process that right now. Please try again in a moment.'
+        'I’m having trouble connecting right now. Please try again.'
       );
-      console.error('Codex chat error:',error);
+
     }finally{
+      setTyping(false);
       state.sending=false;
-      input.focus();
+
+      const currentInput=document.querySelector('.codex-chat-input');
+      if(currentInput){
+        currentInput.focus();
+      }
     }
   }
 
