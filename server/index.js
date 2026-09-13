@@ -7,11 +7,11 @@ const multer=require('multer');
 const {v2:cloudinary}=require('cloudinary');
 const {pool,query,initDb}=require('./db');
 const nodemailer=require('nodemailer');
-const {GoogleGenAI}=require('@google/genai');
+const Groq=require('groq-sdk');
 require('dotenv').config();
 
 const app=express();
-const gemini=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
+const groq=new Groq({apiKey:process.env.GROQ_API_KEY});
 const PORT=Number(process.env.PORT||3000);
 
 
@@ -300,23 +300,31 @@ LIVE PORTFOLIO KNOWLEDGE:
 ${JSON.stringify(knowledge,null,2)}
 `;
 
-    const contents=[
-      ...safeHistory,
+    const messages=[
+      {
+        role:'system',
+        content:systemInstruction
+      },
+      ...safeHistory.map(item=>({
+        role:item.role,
+        content:item.parts?.[0]?.text||''
+      })),
       {
         role:'user',
-        parts:[{text:message}]
+        content:message
       }
     ];
 
-    const response=await gemini.models.generateContent({
-      model:process.env.GEMINI_MODEL||'gemini-3.6-flash',
-      contents,
-      config:{
-        systemInstruction
-      }
+    const response=await groq.chat.completions.create({
+      model:process.env.GROQ_MODEL||'openai/gpt-oss-20b',
+      messages,
+      temperature:0.4,
+      max_tokens:700
     });
 
-    const reply=String(response.text||'').trim();
+    const reply=String(
+      response.choices?.[0]?.message?.content||''
+    ).trim();
 
     if(!reply){
       return res.status(502).json({
@@ -330,10 +338,7 @@ ${JSON.stringify(knowledge,null,2)}
     console.error('Codex chat error:',error);
 
     return res.status(500).json({
-      error:'Chat diagnostic',
-      detail:String(error?.message || error),
-      status:error?.status || null,
-      code:error?.code || null
+      error:'Unable to process the chat request right now.'
     });
   }
 });
