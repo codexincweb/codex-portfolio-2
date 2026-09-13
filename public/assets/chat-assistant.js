@@ -312,7 +312,17 @@
         body:JSON.stringify({message})
       });
 
-      const data=await response.json().catch(()=>({}));
+      const raw=await response.text();
+      let data={};
+
+      try{
+        data=raw?JSON.parse(raw):{};
+      }catch(parseError){
+        console.error('Codex chat invalid JSON:',raw,parseError);
+        throw new Error('The server returned an invalid response');
+      }
+
+      console.log('Codex chat response:',response.status,data);
 
       if(!response.ok){
         throw new Error(data.error||'Unable to get a response');
