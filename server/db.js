@@ -15,11 +15,11 @@ const pool = new Pool({
   ssl: isLocal ? false : { rejectUnauthorized: false },
 
   // Keep the pool small on Termux/Android.
-  max: Number(process.env.DB_POOL_MAX || 2),
+  max: Number(process.env.DB_POOL_MAX || 1),
 
   // Recycle connections before long-lived Neon connections become stale.
-  idleTimeoutMillis: 30000,
-  maxLifetimeSeconds: 300,
+  idleTimeoutMillis: 10000,
+  maxLifetimeSeconds: 120,
 
   connectionTimeoutMillis: 20000,
 
@@ -139,6 +139,22 @@ async function initDb() {
       created_at timestamptz DEFAULT now(),
       updated_at timestamptz DEFAULT now()
     )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS homepage_gallery (
+      id serial PRIMARY KEY,
+      image_url text NOT NULL,
+      image_public_id text NOT NULL,
+      sort_order integer NOT NULL DEFAULT 0,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_homepage_gallery_order
+    ON homepage_gallery(sort_order ASC, created_at ASC)
   `);
 
   await query(`

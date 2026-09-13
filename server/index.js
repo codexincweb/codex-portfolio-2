@@ -939,6 +939,20 @@ app.get('/api/profile',async(req,res)=>{
   res.json(r.rows[0]);
 });
 
+app.get('/api/gallery',async(req,res)=>{
+  try{
+    const r=await query(`
+      SELECT id,image_url,sort_order,created_at
+      FROM homepage_gallery
+      ORDER BY sort_order ASC, created_at ASC
+    `);
+    res.json(r.rows);
+  }catch(error){
+    console.error('Gallery fetch error:',error.message);
+    res.status(500).json({error:'Failed to load gallery'});
+  }
+});
+
 app.get('/api/works',async(req,res)=>{
   const r=await query('SELECT * FROM works ORDER BY featured DESC,created_at DESC');
   res.json(r.rows);
@@ -1005,6 +1019,78 @@ app.put('/api/admin/profile',admin,upload.single('image'),async(req,res)=>{
   );
 
   res.json(r.rows[0]);
+});
+
+app.get('/api/admin/gallery',admin,async(req,res)=>{
+  try{
+    const r=await query(`
+      SELECT *
+      FROM homepage_gallery
+      ORDER BY sort_order ASC, created_at ASC
+    `);
+    res.json(r.rows);
+  }catch(error){
+    console.error('Admin gallery fetch error:',error.message);
+    res.status(500).json({error:'Failed to load gallery'});
+  }
+});
+
+app.post('/api/admin/gallery',admin,upload.single('image'),async(req,res)=>{
+  try{
+    if(!req.file){
+      return res.status(400).json({error:'Image is required'});
+    }
+
+    const uploaded=await uploadToCloudinary(
+      req.file,
+      'codex-inc/home-gallery'
+    );
+
+    const sortOrder=Number.isFinite(Number(req.body.sort_order))
+      ? Number(req.body.sort_order)
+      : 0;
+
+    const r=await query(`
+      INSERT INTO homepage_gallery
+      (image_url,image_public_id,sort_order)
+      VALUES ($1,$2,$3)
+      RETURNING *
+    `,[
+      uploaded.url,
+      uploaded.public_id,
+      sortOrder
+    ]);
+
+    res.status(201).json(r.rows[0]);
+  }catch(error){
+    console.error('Gallery upload error:',error.message);
+    res.status(500).json({error:'Failed to upload gallery image'});
+  }
+});
+
+app.delete('/api/admin/gallery/:id',admin,async(req,res)=>{
+  try{
+    const current=await query(
+      'SELECT image_public_id FROM homepage_gallery WHERE id=$1',
+      [req.params.id]
+    );
+
+    if(!current.rowCount){
+      return res.status(404).json({error:'Gallery image not found'});
+    }
+
+    await deleteFromCloudinary(current.rows[0].image_public_id);
+
+    await query(
+      'DELETE FROM homepage_gallery WHERE id=$1',
+      [req.params.id]
+    );
+
+    res.json({ok:true});
+  }catch(error){
+    console.error('Gallery delete error:',error.message);
+    res.status(500).json({error:'Failed to delete gallery image'});
+  }
 });
 
 app.post('/api/admin/works',admin,upload.single('image'),async(req,res)=>{
