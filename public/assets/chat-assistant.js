@@ -17,11 +17,35 @@
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#039;');
 
+  const pageLinks={
+    '/index.html':{label:'Home',title:'Go to Home'},
+    '/about.html':{label:'About Codex Inc',title:'Learn about Codex Inc'},
+    '/works.html':{label:'View Projects',title:'Explore Codex Inc projects'},
+    '/services.html':{label:'Our Services',title:'Explore services'},
+    '/experience.html':{label:'Experience',title:'View experience'},
+    '/team-up.html':{label:'Team Up',title:'Collaborate with Codex Inc'},
+    '/updates.html':{label:'Explore Updates',title:'View latest updates'},
+    '/contact.html':{label:'Contact Codex Inc',title:'Get in touch'}
+  };
+
   function renderMarkdown(value){
     let text=escapeHtml(value);
 
-    text=text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]*)\)/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    text=text.replace(
+      /\[([^\]]+)\]\((\/[^\s)]+|https?:\/\/[^\s)]+)\)/g,
+      function(_,label,url){
+        const internal=pageLinks[url];
+        if(internal){
+          return '<button type="button" class="codex-chat-nav" data-chat-url="'+url+'">'+
+            escapeHtml(internal.label)+
+          '</button>';
+        }
+
+        return '<a class="codex-chat-external" href="'+url+
+          '" target="_blank" rel="noopener noreferrer">'+
+          label+
+          '</a>';
+      }
     );
 
     text=text.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
@@ -66,20 +90,41 @@
     root.id='codex-chat';
 
     root.innerHTML=`
-      <button class="codex-chat-launcher" type="button" aria-label="Open Codex Inc assistant" aria-expanded="false">
+      <button
+        class="codex-chat-launcher"
+        type="button"
+        aria-label="Open Codex Inc Assistant"
+        aria-expanded="false"
+        aria-controls="codex-chat-panel"
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 2v-4.2A7.45 7.45 0 0 1 2.5 11.5 7.5 7.5 0 0 1 10 4h2.5A7.5 7.5 0 0 1 20 11.5Z"/>
           <path d="M8 11h8M8 14h5"/>
         </svg>
+        <span>Chat with Codex</span>
       </button>
 
-      <section class="codex-chat-panel" aria-label="Codex Inc assistant" hidden>
+      <section
+        id="codex-chat-panel"
+        class="codex-chat-panel"
+        aria-label="Codex Inc Assistant"
+        aria-hidden="true"
+        hidden
+      >
         <header class="codex-chat-header">
-          <div>
-            <strong>Codex Inc Assistant</strong>
-            <span>Ask about Codex Inc</span>
+          <div class="codex-chat-brand">
+            <div class="codex-chat-avatar" aria-hidden="true">C</div>
+            <div>
+              <strong>Codex Inc Assistant</strong>
+              <span><i></i> Available to help</span>
+            </div>
           </div>
-          <button class="codex-chat-close" type="button" aria-label="Close assistant">
+
+          <button
+            class="codex-chat-close"
+            type="button"
+            aria-label="Close assistant"
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m6 6 12 12M18 6 6 18"/>
             </svg>
@@ -96,7 +141,12 @@
             placeholder="Ask about Codex Inc..."
             aria-label="Message"
           ></textarea>
-          <button class="codex-chat-send" type="submit" aria-label="Send message">
+
+          <button
+            class="codex-chat-send"
+            type="submit"
+            aria-label="Send message"
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m4 4 16 8-16 8 3-8-3-8Z"/>
               <path d="M7 12h13"/>
@@ -104,7 +154,10 @@
           </button>
         </form>
 
-        <div class="codex-chat-footer">Powered by Gemini</div>
+        <div class="codex-chat-footer">
+          <span>Codex Inc</span>
+          <span>AI Assistant</span>
+        </div>
       </section>
     `;
 
@@ -116,42 +169,77 @@
     const form=root.querySelector('.codex-chat-form');
     const input=root.querySelector('.codex-chat-input');
 
-    launcher.addEventListener('click',()=>{
-      state.open=!state.open;
-      panel.hidden=!state.open;
-      launcher.setAttribute('aria-expanded',String(state.open));
+    function openChat(){
+      state.open=true;
+      panel.hidden=false;
+      panel.setAttribute('aria-hidden','false');
+      launcher.setAttribute('aria-expanded','true');
+      launcher.classList.add('is-open');
+      window.setTimeout(()=>input.focus(),50);
+    }
+
+    function closeChat(){
+      state.open=false;
+      panel.hidden=true;
+      panel.setAttribute('aria-hidden','true');
+      launcher.setAttribute('aria-expanded','false');
+      launcher.classList.remove('is-open');
+      launcher.focus();
+    }
+
+    launcher.addEventListener('click',function(event){
+      event.preventDefault();
+      event.stopPropagation();
 
       if(state.open){
-        input.focus();
+        closeChat();
+      }else{
+        openChat();
       }
     });
 
-    close.addEventListener('click',()=>{
-      state.open=false;
-      panel.hidden=true;
-      launcher.setAttribute('aria-expanded','false');
+    close.addEventListener('click',function(event){
+      event.preventDefault();
+      event.stopPropagation();
+      closeChat();
     });
 
-    form.addEventListener('submit',event=>{
+    panel.addEventListener('click',function(event){
+      const navigation=event.target.closest('[data-chat-url]');
+      if(!navigation) return;
+
+      event.preventDefault();
+
+      const url=navigation.getAttribute('data-chat-url');
+      if(url) window.location.href=url;
+    });
+
+    document.addEventListener('keydown',function(event){
+      if(event.key==='Escape' && state.open){
+        closeChat();
+      }
+    });
+
+    form.addEventListener('submit',function(event){
       event.preventDefault();
       sendMessage();
     });
 
-    input.addEventListener('keydown',event=>{
+    input.addEventListener('keydown',function(event){
       if(event.key==='Enter'&&!event.shiftKey){
         event.preventDefault();
         form.requestSubmit();
       }
     });
 
-    input.addEventListener('input',()=>{
+    input.addEventListener('input',function(){
       input.style.height='auto';
       input.style.height=Math.min(input.scrollHeight,120)+'px';
     });
 
     addMessage(
       'assistant',
-      'Hi. I’m the Codex Inc assistant. Ask me about Codex Inc, our projects, services, experience, Team Up, or anything else on the platform.'
+      'Hi. I’m the Codex Inc assistant. Ask me about our projects, services, experience, Team Up, updates, or how to contact us.'
     );
   }
 
@@ -159,11 +247,17 @@
     const container=document.querySelector('.codex-chat-messages');
     if(!container) return;
 
-    container.innerHTML=state.messages.map(message=>`
-      <div class="codex-chat-message codex-chat-message-${message.role}">
-        <div class="codex-chat-bubble">${message.role==='assistant' ? renderMarkdown(message.text) : escapeHtml(message.text).replace(/\n/g,'<br>')}</div>
-      </div>
-    `).join('');
+    container.innerHTML=state.messages.map(function(message){
+      return `
+        <div class="codex-chat-message codex-chat-message-${message.role}">
+          <div class="codex-chat-bubble">${
+            message.role==='assistant'
+              ? renderMarkdown(message.text)
+              : escapeHtml(message.text).replace(/\n/g,'<br>')
+          }</div>
+        </div>
+      `;
+    }).join('');
 
     container.scrollTop=container.scrollHeight;
   }
@@ -183,7 +277,13 @@
       const typing=document.createElement('div');
       typing.id='codex-chat-typing';
       typing.className='codex-chat-message codex-chat-message-assistant';
-      typing.innerHTML='<div class="codex-chat-bubble codex-chat-typing"><span></span><span></span><span></span></div>';
+
+      typing.innerHTML=`
+        <div class="codex-chat-bubble codex-chat-typing">
+          <span></span><span></span><span></span>
+        </div>
+      `;
+
       container.appendChild(typing);
       container.scrollTop=container.scrollHeight;
     }else if(!show&&existing){
@@ -219,10 +319,16 @@
       }
 
       setTyping(false);
-      addMessage('assistant',String(data.reply||'I’m unable to answer that right now.'));
+      addMessage(
+        'assistant',
+        String(data.reply||'I’m unable to answer that right now.')
+      );
     }catch(error){
       setTyping(false);
-      addMessage('assistant','Sorry, I couldn’t process that right now. Please try again in a moment.');
+      addMessage(
+        'assistant',
+        'Sorry, I couldn’t process that right now. Please try again in a moment.'
+      );
       console.error('Codex chat error:',error);
     }finally{
       state.sending=false;
