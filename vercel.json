@@ -3,6 +3,22 @@
     {
       "source": "/api/:path*",
       "destination": "/api/index"
+    },
+    {
+      "source": "/update/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/work/:slug",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/updates",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/api/index"
     }
   ]
 }
