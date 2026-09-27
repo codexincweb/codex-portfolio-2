@@ -1,3 +1,4 @@
+const fs=require('fs');
 const path=require('path');
 const express=require('express');
 const session=require('express-session');
@@ -1587,9 +1588,87 @@ app.get('/updates',(req,res)=>
   res.sendFile(path.join(__dirname,'..','public','updates.html'))
 );
 
-app.get('/update/:slug',(req,res)=>
-  res.sendFile(path.join(__dirname,'..','public','update.html'))
-);
+app.get('/update/:slug',async(req,res)=>{
+  try{
+    const result=await query(`
+      SELECT
+        slug,
+        title,
+        excerpt,
+        author,
+        cover_image_url,
+        published_at
+      FROM updates
+      WHERE slug=$1
+        AND status='published'
+      LIMIT 1
+    `,[req.params.slug]);
+
+    if(!result.rowCount){
+      return res.status(404).send('Update not found');
+    }
+
+    const update=result.rows[0];
+    const template=fs.readFileSync(
+      path.join(__dirname,'..','public','update.html'),
+      'utf8'
+    );
+
+    const escapeAttr=value=>String(value||'')
+      .replace(/&/g,'&amp;')
+      .replace(/"/g,'&quot;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;');
+
+    const protocol=(
+      req.headers['x-forwarded-proto']?.split(',')[0]
+      || req.protocol
+      || 'https'
+    );
+
+    const canonicalUrl=
+      `${protocol}://${req.get('host')}/update/${encodeURIComponent(update.slug)}`;
+
+    const title=escapeAttr(update.title);
+    const description=escapeAttr(update.excerpt||'Codex Inc update');
+    const image=escapeAttr(update.cover_image_url||'');
+    const author=escapeAttr(update.author||'Codex Inc');
+    const publishedTime=update.published_at
+      ? new Date(update.published_at).toISOString()
+      : '';
+
+    const metadata=`
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  ${image?`<meta property="og:image" content="${image}">`:''}
+  <meta property="og:url" content="${escapeAttr(canonicalUrl)}">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Codex Inc">
+  ${publishedTime?`<meta property="article:published_time" content="${publishedTime}">`:''}
+  <meta property="article:author" content="${author}">
+  <meta name="twitter:card" content="${image?'summary_large_image':'summary'}">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  ${image?`<meta name="twitter:image" content="${image}">`:''}
+  <link rel="canonical" href="${escapeAttr(canonicalUrl)}">
+`;
+
+    const html=template
+      .replace(
+        '<meta name="description" content="Codex Inc update">',
+        `<meta name="description" content="${description}">${metadata}`
+      )
+      .replace(
+        '<title>Update — Codex Inc</title>',
+        `<title>${title} — Codex Inc</title>`
+      );
+
+    res.type('html').send(html);
+  }catch(error){
+    console.error('Failed to load update page:',error);
+    res.status(500).send('Unable to load update');
+  }
+});
 
 app.get('/work/:slug',(req,res)=>
   res.sendFile(path.join(__dirname,'..','public','work.html'))
