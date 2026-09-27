@@ -1,6 +1,6 @@
 (function(){
   const saved=localStorage.getItem('codex-theme');
-  if(saved==='dark') document.documentElement.classList.add('dark');
+  if(saved!=='light') document.documentElement.classList.add('dark');
 
   function updateThemeButton(){
     const btn=document.querySelector('[data-theme-toggle]');
