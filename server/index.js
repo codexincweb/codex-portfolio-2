@@ -1630,15 +1630,19 @@ async function initializeDatabaseWithRetry(){
   }
 }
 
-(async()=>{
-  try{
-    await initializeDatabaseWithRetry();
+module.exports=app;
 
-    app.listen(PORT,'0.0.0.0',()=>{
-      console.log(`Codex Inc portfolio running on port ${PORT}`)
-    });
-  }catch(e){
-    console.error('Database initialization failed after all retries:',e);
-    process.exit(1);
-  }
-})();
+if(!process.env.VERCEL){
+  (async()=>{
+    try{
+      await initializeDatabaseWithRetry();
+
+      app.listen(PORT,'0.0.0.0',()=>{
+        console.log(`Codex Inc portfolio running on port ${PORT}`)
+      });
+    }catch(e){
+      console.error('Database initialization failed after all retries:',e);
+      process.exit(1);
+    }
+  })();
+}
