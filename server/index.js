@@ -449,9 +449,12 @@ app.post('/api/team-up/apply',resumeUpload.single('resume'),async(req,res)=>{
       resume_url:resume.url
     };
 
-    sendTeamUpNotification(application)
-      .then(()=>console.log(`Team Up admin email sent for application ${application.id}`))
-      .catch(mailError=>console.error('Team Up notification email failed:',mailError.message));
+    try{
+      await sendTeamUpNotification(application);
+      console.log(`Team Up admin email sent for application ${application.id}`);
+    }catch(mailError){
+      console.error('Team Up notification email failed:',mailError.message);
+    }
 
     res.status(201).json({
       success:true,
