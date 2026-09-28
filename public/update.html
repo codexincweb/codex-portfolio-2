@@ -457,6 +457,67 @@
     );
 
     loadArticle();
+
+    /* Match the portfolio page transition when navigating away */
+    (function(){
+      const reduceMotion=window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches;
+
+      if(reduceMotion) return;
+
+      document.addEventListener('click',event=>{
+        const link=event.target.closest('a[href]');
+
+        if(!link) return;
+        if(link.target==='_blank') return;
+        if(link.hasAttribute('download')) return;
+
+        const href=link.getAttribute('href');
+
+        if(!href) return;
+        if(href.startsWith('#')) return;
+        if(href.startsWith('mailto:')) return;
+        if(href.startsWith('tel:')) return;
+        if(href.startsWith('javascript:')) return;
+
+        let url;
+
+        try{
+          url=new URL(href,window.location.href);
+        }catch{
+          return;
+        }
+
+        if(url.origin!==window.location.origin) return;
+        if(
+          url.pathname===window.location.pathname &&
+          url.search===window.location.search
+        ) return;
+
+        event.preventDefault();
+
+        const loader=document.createElement('div');
+        loader.className='page-loader';
+        loader.setAttribute('aria-hidden','true');
+        loader.innerHTML=`
+          <div class="page-loader-inner">
+            <div class="page-loader-brand"></div>
+            <div class="page-loader-line"></div>
+            <div class="page-loader-line short"></div>
+          </div>
+        `;
+
+        document.documentElement.classList.add('page-loading');
+        document.body.prepend(loader);
+
+        requestAnimationFrame(()=>{
+          setTimeout(()=>{
+            window.location.href=url.href;
+          },120);
+        });
+      });
+    })();
   </script>
 
 </body>
