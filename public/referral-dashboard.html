@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Referral Dashboard | Codex Inc</title>
+<meta name="description" content="Manage your Codex Inc referral account, referral link and earnings.">
+<link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+
+<header class="site-header">
+  <div class="container nav-wrap">
+    <a href="/" class="brand">Codex Inc</a>
+
+    <button
+      class="menu-toggle"
+      type="button"
+      aria-label="Open navigation"
+      aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <nav class="site-nav" aria-label="Main navigation">
+      <a href="/">Home</a>
+      <a href="/about.html">About</a>
+      <a href="/works.html">Works</a>
+      <a href="/services.html">Services</a>
+      <a href="/experience.html">Experience</a>
+      <a href="/updates">Updates</a>
+      <a href="/team-up.html">Team Up</a>
+      <a href="/contact.html">Contact</a>
+      <a href="/referrals.html">Referrals</a>
+    </nav>
+  </div>
+</header>
+
+<main class="referral-dashboard-page">
+
+  <section class="section">
+    <div class="container">
+
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Referral Dashboard</div>
+          <h1>Welcome back.</h1>
+          <p id="dashboard-welcome">
+            Loading your referral account...
+          </p>
+        </div>
+
+        <button
+          id="referral-logout-button"
+          class="btn"
+          type="button">
+          Sign out
+        </button>
+      </div>
+
+      <div
+        id="referral-dashboard-status"
+        class="form-status"
+        role="status"
+        aria-live="polite">
+      </div>
+
+      <div class="referral-dashboard-grid">
+
+        <article class="referral-dashboard-card referral-link-card">
+          <div class="eyebrow">Your referral link</div>
+          <h2>Share your link</h2>
+
+          <p>
+            Anyone who starts working with Codex Inc through your referral
+            can be attributed to your account.
+          </p>
+
+          <div class="referral-link-box">
+            <input
+              id="referral-link"
+              type="text"
+              readonly
+              aria-label="Your referral link">
+          </div>
+
+          <div class="referral-actions">
+            <button
+              id="copy-referral-link"
+              class="btn primary"
+              type="button">
+              Copy link
+            </button>
+
+            <button
+              id="share-referral-link"
+              class="btn"
+              type="button">
+              Share
+            </button>
+          </div>
+        </article>
+
+        <article class="referral-dashboard-card">
+          <div class="eyebrow">Referral code</div>
+          <h2 id="referral-code">—</h2>
+          <p>
+            Your unique code identifies referrals connected to your account.
+          </p>
+        </article>
+
+        <article class="referral-dashboard-card">
+          <div class="eyebrow">Account</div>
+          <h2 id="referral-name">—</h2>
+          <p id="referral-email">—</p>
+        </article>
+
+      </div>
+
+      <div class="section-head dashboard-section-head">
+        <div>
+          <div class="eyebrow">Performance</div>
+          <h2>Your referral activity</h2>
+        </div>
+      </div>
+
+      <div class="referral-stats-grid">
+
+        <article class="referral-stat-card">
+          <span>Clicks</span>
+          <strong id="stat-clicks">0</strong>
+        </article>
+
+        <article class="referral-stat-card">
+          <span>Referred clients</span>
+          <strong id="stat-clients">0</strong>
+        </article>
+
+        <article class="referral-stat-card">
+          <span>Pending commission</span>
+          <strong id="stat-pending">₦0.00</strong>
+        </article>
+
+        <article class="referral-stat-card">
+          <span>Total commission</span>
+          <strong id="stat-total">₦0.00</strong>
+        </article>
+
+      </div>
+
+      <div class="referral-dashboard-note">
+        <div class="eyebrow">How commission works</div>
+        <h2>5% of eligible payments</h2>
+        <p>
+          When a referred client pays Codex Inc, you earn 5% of the
+          payment received from that client, subject to the referral
+          program terms.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<script src="/assets/app.js"></script>
+<script src="/assets/referral-dashboard.js"></script>
+
+</body>
+</html>

@@ -2,6 +2,7 @@ const fs=require('fs');
 const path=require('path');
 const express=require('express');
 const session=require('express-session');
+const cookieParser=require('cookie-parser');
 const crypto=require('crypto');
 const pgSession=require('connect-pg-simple')(session);
 const multer=require('multer');
@@ -14,6 +15,152 @@ require('dotenv').config();
 const app=express();
 const groq=new Groq({apiKey:process.env.GROQ_API_KEY});
 const PORT=Number(process.env.PORT||3000);
+
+const REFERRAL_SESSION_DAYS =
+  Math.max(1,Number(process.env.REFERRAL_SESSION_DAYS||7));
+
+const REFERRAL_COMMISSION_RATE =
+  Math.max(0,Math.min(1,Number(
+    process.env.REFERRAL_COMMISSION_RATE||0.05
+  )));
+
+function normalizeReferralEmail(value){
+  return String(value||'').trim().toLowerCase();
+}
+
+function hashReferralPassword(password){
+  return new Promise((resolve,reject)=>{
+    const salt=crypto.randomBytes(16).toString('hex');
+
+    crypto.scrypt(
+      String(password),
+      salt,
+      64,
+      {
+        N:16384,
+        r:8,
+        p:1
+      },
+      (error,derivedKey)=>{
+        if(error)return reject(error);
+
+        resolve(
+          `scrypt:${salt}:${derivedKey.toString('hex')}`
+        );
+      }
+    );
+  });
+}
+
+function verifyReferralPassword(password,storedHash){
+  return new Promise((resolve,reject)=>{
+    const parts=String(storedHash||'').split(':');
+
+    if(parts.length!==3 || parts[0]!=='scrypt'){
+      return resolve(false);
+    }
+
+    const salt=parts[1];
+    const expected=Buffer.from(parts[2],'hex');
+
+    crypto.scrypt(
+      String(password),
+      salt,
+      expected.length,
+      {
+        N:16384,
+        r:8,
+        p:1
+      },
+      (error,derivedKey)=>{
+        if(error)return reject(error);
+
+        if(derivedKey.length!==expected.length){
+          return resolve(false);
+        }
+
+        resolve(
+          crypto.timingSafeEqual(derivedKey,expected)
+        );
+      }
+    );
+  });
+}
+
+function generateReferralCode(){
+  return `CDX-${crypto.randomBytes(5).toString('hex').toUpperCase()}`;
+}
+
+function getReferralPublicUser(user){
+  return {
+    id:user.id,
+    full_name:user.full_name,
+    email:user.email,
+    phone:user.phone,
+    avatar_url:user.avatar_url,
+    referral_code:user.referral_code,
+    status:user.status,
+    email_verified:user.email_verified,
+    created_at:user.created_at,
+    last_login_at:user.last_login_at
+  };
+}
+
+
+async function verifyTurnstile(token,remoteIp){
+  const secret=String(process.env.TURNSTILE_SECRET_KEY||'').trim();
+
+  if(!secret){
+    throw new Error('TURNSTILE_SECRET_KEY is not configured');
+  }
+
+  if(!token){
+    return {
+      success:false,
+      errorCodes:['missing-input-response']
+    };
+  }
+
+  const params=new URLSearchParams();
+
+  params.set('secret',secret);
+  params.set('response',String(token));
+
+  if(remoteIp){
+    params.set('remoteip',String(remoteIp));
+  }
+
+  const response=await fetch(
+    'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+    {
+      method:'POST',
+      headers:{
+        'content-type':'application/x-www-form-urlencoded'
+      },
+      body:params.toString()
+    }
+  );
+
+  if(!response.ok){
+    throw new Error(
+      `Turnstile verification request failed with HTTP ${response.status}`
+    );
+  }
+
+  return response.json();
+}
+
+function referralAuth(req,res,next){
+  if(!req.session.referralUser){
+    return res.status(401).json({
+      error:'Referral account authentication required'
+    });
+  }
+
+  next();
+}
+
+
 
 
 const mailer=nodemailer.createTransport({
@@ -135,6 +282,7 @@ async function deleteResumeFromCloudinary(publicId){
 app.set('trust proxy',1);
 app.use(express.json({limit:'1mb'}));
 app.use(express.urlencoded({extended:true}));
+app.use(cookieParser());
 
 const sessionConfig={
   secret:process.env.SESSION_SECRET||'dev-secret',
@@ -184,6 +332,830 @@ function checkChatRateLimit(req){
   current.count += 1;
   return true;
 }
+
+
+app.post('/api/referrals/login',async(req,res)=>{
+  try{
+    const email=normalizeReferralEmail(req.body.email);
+    const password=String(req.body.password||'');
+    const turnstileToken=String(
+      req.body.turnstile_token||''
+    ).trim();
+
+    if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      return res.status(400).json({
+        error:'Please provide a valid email address.'
+      });
+    }
+
+    if(!password){
+      return res.status(400).json({
+        error:'Please enter your password.'
+      });
+    }
+
+    if(!turnstileToken){
+      return res.status(400).json({
+        error:'Please complete the human verification.'
+      });
+    }
+
+    let turnstileResult;
+
+    try{
+      const forwarded=String(
+        req.headers['x-forwarded-for']||''
+      ).split(',')[0].trim();
+
+      const remoteIp=
+        forwarded ||
+        req.socket.remoteAddress ||
+        '';
+
+      turnstileResult=await verifyTurnstile(
+        turnstileToken,
+        remoteIp
+      );
+    }catch(error){
+      console.error(
+        'Turnstile login verification error:',
+        error.message
+      );
+
+      return res.status(503).json({
+        error:'Human verification is temporarily unavailable. Please try again.'
+      });
+    }
+
+    if(!turnstileResult?.success){
+      return res.status(400).json({
+        error:'Human verification failed. Please try again.'
+      });
+    }
+
+    const result=await query(
+      `
+      SELECT
+        id,
+        full_name,
+        email,
+        phone,
+        password_hash,
+        avatar_url,
+        referral_code,
+        status,
+        email_verified,
+        created_at,
+        last_login_at
+      FROM referral_users
+      WHERE email=$1
+      LIMIT 1
+      `,
+      [email]
+    );
+
+    if(!result.rowCount){
+      return res.status(401).json({
+        error:'Invalid email or password.'
+      });
+    }
+
+    const user=result.rows[0];
+
+    if(user.status!=='active'){
+      return res.status(403).json({
+        error:'This referral account is currently suspended.'
+      });
+    }
+
+    if(!user.password_hash){
+      return res.status(400).json({
+        error:'This account uses Google sign-in. Please continue with Google.'
+      });
+    }
+
+    const passwordValid=await verifyReferralPassword(
+      password,
+      user.password_hash
+    );
+
+    if(!passwordValid){
+      return res.status(401).json({
+        error:'Invalid email or password.'
+      });
+    }
+
+    await new Promise((resolve,reject)=>{
+      req.session.regenerate(error=>{
+        if(error)return reject(error);
+        resolve();
+      });
+    });
+
+    req.session.referralUser={
+      id:user.id
+    };
+
+    req.session.cookie.maxAge=
+      1000*60*60*24*REFERRAL_SESSION_DAYS;
+
+    await query(
+      `
+      UPDATE referral_users
+      SET
+        last_login_at=now(),
+        updated_at=now()
+      WHERE id=$1
+      `,
+      [user.id]
+    );
+
+    await new Promise((resolve,reject)=>{
+      req.session.save(error=>{
+        if(error)return reject(error);
+        resolve();
+      });
+    });
+
+    res.json({
+      ok:true,
+      user:getReferralPublicUser({
+        ...user,
+        last_login_at:new Date()
+      })
+    });
+
+  }catch(error){
+    console.error(
+      'Referral login error:',
+      error.message
+    );
+
+    res.status(500).json({
+      error:'Unable to sign you in right now.'
+    });
+  }
+});
+
+app.get('/api/referrals/stats',referralAuth,async(req,res)=>{
+  try{
+    const userId=req.session.referralUser.id;
+
+    const clicksResult=await query(
+      `
+      SELECT COUNT(*)::integer AS count
+      FROM referral_clicks
+      WHERE referral_user_id=$1
+      `,
+      [userId]
+    );
+
+    const clientsResult=await query(
+      `
+      SELECT COUNT(*)::integer AS count
+      FROM referral_leads
+      WHERE referral_user_id=$1
+        AND status='converted'
+      `,
+      [userId]
+    );
+
+    const commissionResult=await query(
+      `
+      SELECT
+        COALESCE(
+          SUM(
+            CASE
+              WHEN status IN ('pending','approved')
+              THEN commission_amount
+              ELSE 0
+            END
+          ),
+          0
+        )::numeric AS pending,
+        COALESCE(
+          SUM(
+            CASE
+              WHEN status IN ('pending','approved','paid')
+              THEN commission_amount
+              ELSE 0
+            END
+          ),
+          0
+        )::numeric AS total
+      FROM referral_commissions
+      WHERE referral_user_id=$1
+      `,
+      [userId]
+    );
+
+    const commissions=commissionResult.rows[0];
+
+    res.json({
+      ok:true,
+      stats:{
+        clicks:Number(clicksResult.rows[0]?.count||0),
+        clients:Number(clientsResult.rows[0]?.count||0),
+        pending_commission:Number(
+          commissions?.pending||0
+        ),
+        total_commission:Number(
+          commissions?.total||0
+        )
+      }
+    });
+
+  }catch(error){
+    console.error(
+      'Referral stats error:',
+      error.message
+    );
+
+    res.status(500).json({
+      error:'Unable to load referral statistics.'
+    });
+  }
+});
+
+app.post('/api/referrals/logout',(req,res)=>{
+  req.session.destroy(error=>{
+    if(error){
+      console.error(
+        'Referral logout error:',
+        error.message
+      );
+
+      return res.status(500).json({
+        error:'Unable to sign you out right now.'
+      });
+    }
+
+    res.clearCookie('connect.sid');
+
+    res.json({
+      ok:true
+    });
+  });
+});
+
+app.get('/api/referrals/me',referralAuth,async(req,res)=>{
+  try{
+    const result=await query(
+      `
+      SELECT
+        id,
+        full_name,
+        email,
+        phone,
+        avatar_url,
+        referral_code,
+        status,
+        email_verified,
+        created_at,
+        last_login_at
+      FROM referral_users
+      WHERE id=$1
+      LIMIT 1
+      `,
+      [req.session.referralUser.id]
+    );
+
+    if(!result.rowCount){
+      req.session.destroy(()=>{});
+
+      return res.status(401).json({
+        error:'Referral account no longer exists.'
+      });
+    }
+
+    const user=result.rows[0];
+
+    if(user.status!=='active'){
+      req.session.destroy(()=>{});
+
+      return res.status(403).json({
+        error:'This referral account is currently suspended.'
+      });
+    }
+
+    res.json({
+      ok:true,
+      user:getReferralPublicUser(user)
+    });
+
+  }catch(error){
+    console.error(
+      'Referral session lookup error:',
+      error.message
+    );
+
+    res.status(500).json({
+      error:'Unable to load your referral account.'
+    });
+  }
+});
+
+app.get('/ref/:code',async(req,res)=>{
+  try{
+    const referralCode=String(
+      req.params.code||''
+    ).trim().toUpperCase();
+
+    if(!/^CDX-[A-Z0-9]{10}$/.test(referralCode)){
+      return res.status(404).send('Referral link not found.');
+    }
+
+    const result=await query(
+      `
+      SELECT
+        id,
+        referral_code,
+        status
+      FROM referral_users
+      WHERE referral_code=$1
+      LIMIT 1
+      `,
+      [referralCode]
+    );
+
+    if(!result.rowCount || result.rows[0].status!=='active'){
+      return res.status(404).send('Referral link not found.');
+    }
+
+    const user=result.rows[0];
+
+    let visitorToken=req.cookies?.referral_visitor;
+
+    if(!visitorToken){
+      visitorToken=crypto.randomBytes(24).toString('hex');
+
+      res.cookie(
+        'referral_visitor',
+        visitorToken,
+        {
+          httpOnly:true,
+          sameSite:'lax',
+          secure:process.env.NODE_ENV==='production',
+          maxAge:1000*60*60*24*90
+        }
+      );
+    }
+
+    const ipAddress=String(
+      req.headers['x-forwarded-for']||''
+    ).split(',')[0].trim() ||
+      req.socket.remoteAddress ||
+      '';
+
+    const ipHash=crypto
+      .createHash('sha256')
+      .update(
+        `${ipAddress}|${process.env.SESSION_SECRET||''}`
+      )
+      .digest('hex');
+
+    await query(
+      `
+      INSERT INTO referral_clicks
+      (
+        referral_user_id,
+        referral_code,
+        visitor_token,
+        landing_path,
+        user_agent,
+        ip_hash
+      )
+      VALUES($1,$2,$3,$4,$5,$6)
+      `,
+      [
+        user.id,
+        user.referral_code,
+        visitorToken,
+        req.originalUrl,
+        String(req.headers['user-agent']||''),
+        ipHash
+      ]
+    );
+
+    res.cookie(
+      'referral_code',
+      user.referral_code,
+      {
+        httpOnly:true,
+        sameSite:'lax',
+        secure:process.env.NODE_ENV==='production',
+        maxAge:1000*60*60*24*30
+      }
+    );
+
+    res.redirect('/contact.html?ref='+encodeURIComponent(
+      user.referral_code
+    ));
+
+  }catch(error){
+    console.error(
+      'Referral link error:',
+      error.message
+    );
+
+    res.redirect('/contact.html');
+  }
+});
+
+app.post('/api/referrals/lead',async(req,res)=>{
+  try{
+    const clientName=String(
+      req.body.client_name||''
+    ).trim();
+
+    const clientEmail=normalizeReferralEmail(
+      req.body.client_email
+    );
+
+    const clientPhone=String(
+      req.body.client_phone||''
+    ).trim();
+
+    const company=String(
+      req.body.company||''
+    ).trim();
+
+    const projectDescription=String(
+      req.body.project_description||''
+    ).trim();
+
+    if(clientName.length<2 || clientName.length>100){
+      return res.status(400).json({
+        error:'Please provide your name.'
+      });
+    }
+
+    if(
+      clientEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)
+    ){
+      return res.status(400).json({
+        error:'Please provide a valid email address.'
+      });
+    }
+
+    if(!clientEmail && !clientPhone){
+      return res.status(400).json({
+        error:'Please provide an email address or phone number.'
+      });
+    }
+
+    if(
+      projectDescription.length<10 ||
+      projectDescription.length>5000
+    ){
+      return res.status(400).json({
+        error:'Please describe the project you need help with.'
+      });
+    }
+
+    const referralCode=String(
+      req.cookies?.referral_code||''
+    ).trim().toUpperCase();
+
+    if(!referralCode){
+      return res.status(400).json({
+        error:'This project inquiry is not connected to a referral link.'
+      });
+    }
+
+    const referralResult=await query(
+      `
+      SELECT
+        id,
+        referral_code,
+        status
+      FROM referral_users
+      WHERE referral_code=$1
+      LIMIT 1
+      `,
+      [referralCode]
+    );
+
+    if(
+      !referralResult.rowCount ||
+      referralResult.rows[0].status!=='active'
+    ){
+      return res.status(400).json({
+        error:'The referral link is no longer active.'
+      });
+    }
+
+    const referralUser=referralResult.rows[0];
+
+    const duplicate=await query(
+      `
+      SELECT id
+      FROM referral_leads
+      WHERE referral_user_id=$1
+        AND client_email=$2
+        AND status NOT IN ('lost')
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
+      [
+        referralUser.id,
+        clientEmail||null
+      ]
+    );
+
+    if(duplicate.rowCount){
+      return res.status(409).json({
+        error:'A project inquiry from this client has already been recorded.'
+      });
+    }
+
+    const result=await query(
+      `
+      INSERT INTO referral_leads
+      (
+        referral_user_id,
+        referral_code,
+        client_name,
+        client_email,
+        client_phone,
+        company,
+        project_description
+      )
+      VALUES($1,$2,$3,$4,$5,$6,$7)
+      RETURNING
+        id,
+        status,
+        created_at
+      `,
+      [
+        referralUser.id,
+        referralUser.referral_code,
+        clientName,
+        clientEmail||null,
+        clientPhone||null,
+        company||null,
+        projectDescription
+      ]
+    );
+
+    res.status(201).json({
+      ok:true,
+      message:'Your project inquiry has been received.',
+      lead_id:result.rows[0].id,
+      status:result.rows[0].status
+    });
+
+  }catch(error){
+    console.error(
+      'Referral lead error:',
+      error.message
+    );
+
+    res.status(500).json({
+      error:'Unable to submit your project inquiry right now.'
+    });
+  }
+});
+
+app.get('/api/referrals/config',(req,res)=>{
+  res.json({
+    turnstile_site_key:
+      String(process.env.TURNSTILE_SITE_KEY||'').trim()
+  });
+});
+
+app.post('/api/referrals/register',async(req,res)=>{
+  try{
+    const fullName=String(req.body.full_name||'').trim();
+    const email=normalizeReferralEmail(req.body.email);
+    const phone=String(req.body.phone||'').trim();
+    const password=String(req.body.password||'');
+    const confirmPassword=String(req.body.confirm_password||'');
+    const turnstileToken=String(req.body.turnstile_token||'').trim();
+
+    if(!turnstileToken){
+      return res.status(400).json({
+        error:'Please complete the human verification.'
+      });
+    }
+
+    let turnstileResult;
+
+    try{
+      const forwarded=String(
+        req.headers['x-forwarded-for']||''
+      ).split(',')[0].trim();
+
+      const remoteIp=
+        forwarded ||
+        req.socket.remoteAddress ||
+        '';
+
+      turnstileResult=await verifyTurnstile(
+        turnstileToken,
+        remoteIp
+      );
+    }catch(error){
+      console.error(
+        'Turnstile verification error:',
+        error.message
+      );
+
+      return res.status(503).json({
+        error:'Human verification is temporarily unavailable. Please try again.'
+      });
+    }
+
+    if(!turnstileResult?.success){
+      return res.status(400).json({
+        error:'Human verification failed. Please try again.',
+        codes:Array.isArray(turnstileResult?.['error-codes'])
+          ? turnstileResult['error-codes']
+          : []
+      });
+    }
+
+    if(fullName.length<2 || fullName.length>100){
+      return res.status(400).json({
+        error:'Please provide your full name.'
+      });
+    }
+
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      return res.status(400).json({
+        error:'Please provide a valid email address.'
+      });
+    }
+
+    if(password.length<8 || password.length>128){
+      return res.status(400).json({
+        error:'Password must be between 8 and 128 characters.'
+      });
+    }
+
+    if(!/[A-Z]/.test(password)){
+      return res.status(400).json({
+        error:'Password must contain at least one uppercase letter.'
+      });
+    }
+
+    if(!/[a-z]/.test(password)){
+      return res.status(400).json({
+        error:'Password must contain at least one lowercase letter.'
+      });
+    }
+
+    if(!/[0-9]/.test(password)){
+      return res.status(400).json({
+        error:'Password must contain at least one number.'
+      });
+    }
+
+    if(!/[^A-Za-z0-9]/.test(password)){
+      return res.status(400).json({
+        error:'Password must contain at least one special character.'
+      });
+    }
+
+    if(password!==confirmPassword){
+      return res.status(400).json({
+        error:'Passwords do not match.'
+      });
+    }
+
+    const termsAgreed =
+      req.body.terms_agreed === true ||
+      req.body.terms_agreed === 'true' ||
+      req.body.terms_agreed === 'on';
+
+    if(!termsAgreed){
+      return res.status(400).json({
+        error:'You must agree to the Codex Referral Program Terms & Conditions.'
+      });
+    }
+
+    const existing=await query(
+      `
+      SELECT id
+      FROM referral_users
+      WHERE email=$1
+      LIMIT 1
+      `,
+      [email]
+    );
+
+    if(existing.rowCount){
+      return res.status(409).json({
+        error:'An account with this email already exists.'
+      });
+    }
+
+    const passwordHash=await hashReferralPassword(password);
+
+    let referralCode;
+    let attempts=0;
+
+    while(!referralCode && attempts<5){
+      attempts++;
+
+      const candidate=generateReferralCode();
+
+      const codeCheck=await query(
+        `
+        SELECT id
+        FROM referral_users
+        WHERE referral_code=$1
+        LIMIT 1
+        `,
+        [candidate]
+      );
+
+      if(!codeCheck.rowCount){
+        referralCode=candidate;
+      }
+    }
+
+    if(!referralCode){
+      console.error('Referral code generation failed.');
+      return res.status(500).json({
+        error:'Unable to create your referral account right now.'
+      });
+    }
+
+    const result=await query(
+      `
+      INSERT INTO referral_users
+      (
+        full_name,
+        email,
+        phone,
+        password_hash,
+        referral_code
+      )
+      VALUES($1,$2,$3,$4,$5)
+      RETURNING
+        id,
+        full_name,
+        email,
+        phone,
+        avatar_url,
+        referral_code,
+        status,
+        email_verified,
+        created_at,
+        last_login_at
+      `,
+      [
+        fullName,
+        email,
+        phone||null,
+        passwordHash,
+        referralCode
+      ]
+    );
+
+    const user=result.rows[0];
+
+    await new Promise((resolve,reject)=>{
+      req.session.regenerate(error=>{
+        if(error)return reject(error);
+        resolve();
+      });
+    });
+
+    req.session.referralUser={
+      id:user.id
+    };
+
+    req.session.cookie.maxAge=
+      1000*60*60*24*REFERRAL_SESSION_DAYS;
+
+    await new Promise((resolve,reject)=>{
+      req.session.save(error=>{
+        if(error)return reject(error);
+        resolve();
+      });
+    });
+
+    res.status(201).json({
+      ok:true,
+      user:getReferralPublicUser(user),
+      referral_url:
+        `${req.protocol}://${req.get('host')}/ref/${user.referral_code}`
+    });
+
+  }catch(error){
+    console.error(
+      'Referral registration error:',
+      error.message
+    );
+
+    res.status(500).json({
+      error:'Unable to create your referral account right now.'
+    });
+  }
+});
 
 app.post('/api/chat', async (req,res)=>{
   if(!checkChatRateLimit(req)){

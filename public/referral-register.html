@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Join the Codex Inc Referral Program and earn 5% commission from eligible payments made by clients you refer.">
+<title>Referral Program — Codex Inc</title>
+<script>if(localStorage.getItem("codex-theme")!=="light")document.documentElement.classList.add("dark");</script>
+<link rel="icon" href="/assets/placeholder.svg">
+<link rel="stylesheet" href="/styles.css">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer data-codex-turnstile="true"></script>
+</head>
+<body>
+
+<header class="site-header">
+<div class="wrap nav">
+<a class="brand" href="/">Codex Inc</a>
+
+<nav class="navlinks">
+<a href="/">Home</a>
+<a href="/about.html">About me</a>
+<a href="/works.html">Works</a>
+<a href="/services.html">Services</a>
+<a href="/experience.html">Experience</a>
+<a href="/updates.html">Updates</a>
+<a href="/contact.html">Contact</a>
+</nav>
+
+<div class="nav-actions">
+<button class="theme-toggle" type="button" data-theme-toggle onclick="toggleTheme()" aria-label="Switch to dark mode" title="Switch to dark mode"></button>
+<a class="btn primary" href="/contact.html">Work with me</a>
+</div>
+</div>
+</header>
+
+<main>
+<section class="section">
+<div class="wrap">
+<div class="section-head">
+<div>
+<div class="eyebrow">Codex Referral Program</div>
+<h1>Create your affiliate account.</h1>
+<p class="lead">
+Register to receive your personal referral link and start earning 5%
+from eligible payments made by clients you genuinely refer.
+</p>
+</div>
+</div>
+
+<div class="card referral-auth-card">
+<form id="referral-register-form" class="form">
+
+<div class="split">
+<div>
+<label for="referral-full-name">Full name</label>
+<input id="referral-full-name" name="full_name" type="text"
+placeholder="Your full name" autocomplete="name" required>
+</div>
+
+<div>
+<label for="referral-phone">Phone number <span>(optional)</span></label>
+<input id="referral-phone" name="phone" type="tel"
+placeholder="Your phone number" autocomplete="tel">
+</div>
+</div>
+
+<div>
+<label for="referral-email">Email address</label>
+<input id="referral-email" name="email" type="email"
+placeholder="you@example.com" autocomplete="email" required>
+</div>
+
+<div class="split">
+<div>
+<label for="referral-password">Password</label>
+<div class="password-field">
+<input id="referral-password" name="password" type="password"
+placeholder="Create a strong password" autocomplete="new-password"
+minlength="8" required>
+<button class="password-toggle" type="button"
+data-password-toggle="referral-password"
+aria-label="Show password"
+title="Show password">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+aria-hidden="true">
+<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/>
+<circle cx="12" cy="12" r="2.5"/>
+</svg>
+</button>
+</div>
+<div id="password-strength" class="password-strength"></div>
+<ul class="password-requirements" id="password-requirements">
+<li data-requirement="length">At least 8 characters</li>
+<li data-requirement="uppercase">At least one uppercase letter</li>
+<li data-requirement="lowercase">At least one lowercase letter</li>
+<li data-requirement="number">At least one number</li>
+<li data-requirement="special">At least one special character</li>
+</ul>
+</div>
+
+<div>
+<label for="referral-confirm-password">Confirm password</label>
+<div class="password-field">
+<input id="referral-confirm-password" name="confirm_password"
+type="password" placeholder="Repeat your password"
+autocomplete="new-password" required>
+<button class="password-toggle" type="button"
+data-password-toggle="referral-confirm-password"
+aria-label="Show password"
+title="Show password">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+aria-hidden="true">
+<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/>
+<circle cx="12" cy="12" r="2.5"/>
+</svg>
+</button>
+</div>
+</div>
+</div>
+
+<label style="display:flex;align-items:flex-start;gap:10px;margin-top:18px;cursor:pointer">
+<input id="referral-terms" name="terms_agreed" type="checkbox"
+required style="width:auto;margin-top:3px">
+<span>
+I agree to the Codex Referral Program Terms &amp; Conditions.
+</span>
+</label>
+
+<div class="cf-turnstile" data-sitekey="0x4AAAAAAFOkx_hxntYDdEb5"></div>
+
+<button class="btn primary" type="submit">
+Create referral account
+</button>
+
+<div id="referral-register-status" class="form-status"
+role="status" aria-live="polite"></div>
+</form>
+
+<div class="referral-divider"><span>or</span></div>
+
+<a class="btn" id="google-referral-button"
+href="/api/referrals/auth/google">
+Continue with Google
+</a>
+
+<p class="small-note" style="margin-top:18px">
+Already have an account?
+<a href="/referral-login.html">Sign in here</a>.
+</p>
+</div>
+</div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="wrap">
+<div>© <span data-year></span> Codex Inc. All rights reserved.</div>
+</div>
+</footer>
+<script src="/assets/app.js"></script>
+<script src="/assets/referrals.js"></script>
+</body>
+</html>

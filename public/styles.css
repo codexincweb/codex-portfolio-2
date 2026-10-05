@@ -1768,3 +1768,88 @@ html.dark #comment-submit {
     transition:none;
   }
 }
+
+.password-field{
+  position:relative;
+}
+
+.password-field input{
+  padding-right:46px;
+}
+
+.password-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  border:0;
+  background:transparent;
+  color:#667085;
+  cursor:pointer;
+  display:grid;
+  place-items:center;
+  border-radius:6px;
+}
+
+.password-toggle:hover{
+  background:#f2f4f7;
+}
+
+.password-toggle svg{
+  width:19px;
+  height:19px;
+  display:block;
+}
+
+.password-strength{
+  margin-top:9px;
+  font-size:12px;
+  font-weight:700;
+}
+
+.password-requirements{
+  margin:10px 0 0;
+  padding:0;
+  list-style:none;
+  display:grid;
+  gap:5px;
+  font-size:12px;
+  color:#667085;
+}
+
+.password-requirements li{
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+.password-requirements li::before{
+  content:'○';
+  font-size:13px;
+}
+
+.password-requirements li.valid{
+  color:#067647;
+}
+
+.password-requirements li.valid::before{
+  content:'✓';
+}
+
+html.dark .password-toggle{
+  color:#98a2b3;
+}
+
+html.dark .password-toggle:hover{
+  background:#344054;
+}
+
+html.dark .password-requirements{
+  color:#98a2b3;
+}
+
+html.dark .password-requirements li.valid{
+  color:#6ce9a6;
+}

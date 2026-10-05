@@ -187,6 +187,124 @@ async function initDb() {
     ON update_reactions(update_id)
   `);
 
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS referral_users (
+      id serial PRIMARY KEY,
+      full_name text NOT NULL,
+      email text NOT NULL UNIQUE,
+      phone text,
+      password_hash text,
+      google_id text UNIQUE,
+      avatar_url text,
+      referral_code text NOT NULL UNIQUE,
+      status text NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active','suspended')),
+      email_verified boolean NOT NULL DEFAULT false,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now(),
+      last_login_at timestamptz
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_referral_users_email
+    ON referral_users(email)
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS referral_clicks (
+      id bigserial PRIMARY KEY,
+      referral_user_id integer NOT NULL
+        REFERENCES referral_users(id)
+        ON DELETE CASCADE,
+      referral_code text NOT NULL,
+      visitor_token text NOT NULL,
+      landing_path text,
+      user_agent text,
+      ip_hash text,
+      created_at timestamptz DEFAULT now()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_referral_clicks_referrer
+    ON referral_clicks(referral_user_id, created_at DESC)
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS referral_leads (
+      id serial PRIMARY KEY,
+      referral_user_id integer NOT NULL
+        REFERENCES referral_users(id)
+        ON DELETE RESTRICT,
+      referral_code text NOT NULL,
+      client_name text NOT NULL,
+      client_email text,
+      client_phone text,
+      company text,
+      project_description text,
+      status text NOT NULL DEFAULT 'new'
+        CHECK (status IN ('new','contacted','qualified','converted','lost')),
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_referral_leads_referrer
+    ON referral_leads(referral_user_id, created_at DESC)
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS referral_commissions (
+      id serial PRIMARY KEY,
+      referral_user_id integer NOT NULL
+        REFERENCES referral_users(id)
+        ON DELETE RESTRICT,
+      lead_id integer
+        REFERENCES referral_leads(id)
+        ON DELETE SET NULL,
+      payment_reference text,
+      payment_amount numeric(14,2) NOT NULL,
+      commission_rate numeric(5,4) NOT NULL DEFAULT 0.0500,
+      commission_amount numeric(14,2) NOT NULL,
+      status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending','approved','paid','rejected')),
+      notes text,
+      created_at timestamptz DEFAULT now(),
+      approved_at timestamptz,
+      paid_at timestamptz
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_referral_commissions_referrer
+    ON referral_commissions(referral_user_id, status, created_at DESC)
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS referral_payouts (
+      id serial PRIMARY KEY,
+      referral_user_id integer NOT NULL
+        REFERENCES referral_users(id)
+        ON DELETE RESTRICT,
+      amount numeric(14,2) NOT NULL,
+      payment_method text,
+      payment_reference text,
+      status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending','processing','paid','failed')),
+      notes text,
+      created_at timestamptz DEFAULT now(),
+      paid_at timestamptz
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_referral_payouts_referrer
+    ON referral_payouts(referral_user_id, status, created_at DESC)
+  `);
+
   const profile = await query(
     'SELECT id FROM profile WHERE id=1'
   );
