@@ -748,7 +748,7 @@ app.get('/ref/:code',async(req,res)=>{
       }
     );
 
-    res.redirect('/contact.html?ref='+encodeURIComponent(
+    res.redirect('/referral-work.html?ref='+encodeURIComponent(
       user.referral_code
     ));
 
@@ -758,7 +758,7 @@ app.get('/ref/:code',async(req,res)=>{
       error.message
     );
 
-    res.redirect('/contact.html');
+    res.redirect('/referral-work.html');
   }
 });
 
@@ -815,7 +815,9 @@ app.post('/api/referrals/lead',async(req,res)=>{
     }
 
     const referralCode=String(
-      req.cookies?.referral_code||''
+      req.cookies?.referral_code ||
+      req.body.referral_code ||
+      ''
     ).trim().toUpperCase();
 
     if(!referralCode){

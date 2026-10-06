@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Start a Project — Codex Inc</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+:root{--rw-bg:#f6f8fb;--rw-card:#fff;--rw-border:#e3e8ef;--rw-text:#101828;--rw-muted:#667085;--rw-accent:#111827}
+.referral-work{min-height:calc(100vh - 80px);background:var(--rw-bg);padding:70px 20px}
+.rw-wrap{max-width:1080px;margin:0 auto}
+.rw-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+.rw-eyebrow{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#667085;margin-bottom:14px}
+.rw-title{font-size:clamp(38px,5vw,60px);line-height:1.02;letter-spacing:-.04em;margin:0 0 20px;color:var(--rw-text)}
+.rw-lead{font-size:18px;line-height:1.7;color:var(--rw-muted);max-width:520px}
+.rw-note{display:flex;gap:14px;margin-top:30px;padding:18px;border:1px solid var(--rw-border);background:#fff;border-radius:14px}
+.rw-note-mark{width:36px;height:36px;border-radius:10px;background:#111827;color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+.rw-note strong{display:block;margin-bottom:4px;color:var(--rw-text)}
+.rw-note span{font-size:14px;line-height:1.55;color:var(--rw-muted)}
+.rw-form{background:var(--rw-card);border:1px solid var(--rw-border);border-radius:18px;padding:30px;box-shadow:0 14px 40px rgba(16,24,40,.06)}
+.rw-form h2{margin:0 0 8px;font-size:27px;letter-spacing:-.02em;color:var(--rw-text)}
+.rw-form>p{margin:0 0 24px;color:var(--rw-muted);line-height:1.6}
+.rw-form label{display:block;font-size:14px;font-weight:600;color:var(--rw-text);margin:17px 0 7px}
+.rw-form input,.rw-form textarea{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:10px;padding:13px 14px;background:#fff;color:#101828;font:inherit;outline:none}
+.rw-form input:focus,.rw-form textarea:focus{border-color:#667085;box-shadow:0 0 0 3px rgba(17,24,39,.08)}
+.rw-form textarea{min-height:145px;resize:vertical}
+.rw-form button{width:100%;margin-top:22px}
+.rw-status{margin-top:14px;font-size:14px;line-height:1.5}
+.rw-ref{margin-top:18px;padding-top:16px;border-top:1px solid var(--rw-border);font-size:12px;color:#98a2b3}
+@media(max-width:800px){.referral-work{padding:45px 18px}.rw-grid{grid-template-columns:1fr;gap:30px}.rw-form{padding:22px}.rw-title{font-size:42px}}
+</style>
+</head>
+<body>
+<header class="site-header">
+<div class="wrap nav">
+<a class="brand" href="/">Codex Inc</a>
+<nav class="navlinks">
+<a href="/">Home</a>
+<a href="/about.html">About us</a>
+<a href="/works.html">Works</a>
+<a href="/services.html">Services</a>
+<a href="/contact.html">Contact</a>
+</nav>
+<div class="nav-actions">
+<a class="btn primary" href="/contact.html">Work with us</a>
+</div>
+</div>
+</header>
+
+<main class="referral-work">
+<div class="rw-wrap">
+<div class="rw-grid">
+
+<section>
+<div class="rw-eyebrow">Referred project</div>
+<h1 class="rw-title">Let's build something useful.</h1>
+<p class="rw-lead">You've reached Codex Inc through one of our partners. Tell us about the project you need and we'll review the request and get back to you.</p>
+
+<div class="rw-note">
+<div class="rw-note-mark">5%</div>
+<div>
+<strong>Partner referral tracked</strong>
+<span>Your request is connected to the partner who referred you. If your project leads to a payment received by Codex Inc, the referring partner earns a 5% commission.</span>
+</div>
+</div>
+</section>
+
+<section class="rw-form">
+<h2>Start your project</h2>
+<p>Share the details below. You don't need a complete specification — an idea is enough to start the conversation.</p>
+
+<form id="referral-work-form">
+<label for="rw-name">Your name</label>
+<input id="rw-name" name="client_name" type="text" autocomplete="name" required>
+
+<label for="rw-email">Email address</label>
+<input id="rw-email" name="client_email" type="email" autocomplete="email">
+
+<label for="rw-phone">Phone / WhatsApp</label>
+<input id="rw-phone" name="client_phone" type="tel" autocomplete="tel">
+
+<label for="rw-company">Company or organisation</label>
+<input id="rw-company" name="company" type="text" autocomplete="organization">
+
+<label for="rw-description">What do you want us to build?</label>
+<textarea id="rw-description" name="project_description" minlength="10" maxlength="5000" required></textarea>
+
+<button class="btn primary" type="submit">Send project request</button>
+<div id="rw-status" class="rw-status" role="status" aria-live="polite"></div>
+</form>
+
+<div id="rw-ref" class="rw-ref"></div>
+</section>
+
+</div>
+</div>
+</main>
+
+<div data-footer></div>
+
+<script src="/assets/app.js"></script>
+<script>
+(function(){
+const form=document.getElementById('referral-work-form');
+const status=document.getElementById('rw-status');
+const refInfo=document.getElementById('rw-ref');
+const params=new URLSearchParams(window.location.search);
+const ref=params.get('ref');
+
+if(ref){
+  refInfo.textContent='Referral reference: '+ref.toUpperCase();
+}
+
+form.addEventListener('submit',async function(event){
+  event.preventDefault();
+  status.textContent='Sending your project request...';
+  status.className='rw-status';
+
+  const body={
+    client_name:form.client_name.value.trim(),
+    client_email:form.client_email.value.trim(),
+    client_phone:form.client_phone.value.trim(),
+    company:form.company.value.trim(),
+    project_description:form.project_description.value.trim(),
+    referral_code:ref ? ref.toUpperCase() : ''
+  };
+
+  try{
+    const response=await fetch('/api/referrals/lead',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify(body)
+    });
+
+    const data=await response.json().catch(()=>({}));
+
+    if(!response.ok){
+      throw new Error(data.error||'Unable to send your project request.');
+    }
+
+    form.reset();
+    status.textContent='Your project request has been received. Codex Inc will review it and get back to you.';
+    status.className='rw-status success';
+  }catch(error){
+    status.textContent=error.message||'Unable to send your project request.';
+    status.className='rw-status error';
+  }
+});
+})();
+</script>
+</body>
+</html>
