@@ -5,6 +5,10 @@
       "destination": "/api/index"
     },
     {
+      "source": "/ref/:code",
+      "destination": "/api/index"
+    },
+    {
       "source": "/update/:slug",
       "destination": "/api/index"
     },

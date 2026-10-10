@@ -349,9 +349,22 @@
             );
           }
 
+          if (data.verification_required) {
+            setStatus(
+              registerStatus,
+              'Verification code sent. Redirecting to email verification...'
+            );
+
+            window.location.href =
+              '/referral-verify.html?email=' +
+              encodeURIComponent(data.email || '');
+
+            return;
+          }
+
           setStatus(
             registerStatus,
-            'Your referral account has been created. Redirecting...'
+            'Registration completed. Redirecting...'
           );
 
           window.location.href =

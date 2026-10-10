@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Verify your email address for the Codex Inc Referral Program.">
+<title>Verify Email — Codex Inc</title>
+<script>if(localStorage.getItem("codex-theme")!=="light")document.documentElement.classList.add("dark");</script>
+<link rel="icon" href="/assets/placeholder.svg">
+<link rel="stylesheet" href="/styles.css">
+<style>
+.referral-verify-card{max-width:520px;margin:0 auto}
+.verification-code-input{font-size:1.6rem!important;letter-spacing:.45rem;text-align:center;font-weight:700}
+.verification-help{line-height:1.7;color:var(--muted,#64748b)}
+</style>
+</head>
+<body>
+<header class="site-header">
+<div class="wrap nav">
+<a class="brand" href="/">Codex Inc</a>
+<nav class="navlinks">
+<a href="/">Home</a>
+<a href="/about.html">About me</a>
+<a href="/works.html">Works</a>
+<a href="/services.html">Services</a>
+<a href="/experience.html">Experience</a>
+<a href="/updates.html">Updates</a>
+<a href="/contact.html">Contact</a>
+</nav>
+<div class="nav-actions">
+<button class="theme-toggle" type="button" data-theme-toggle onclick="toggleTheme()" aria-label="Switch theme" title="Switch theme"></button>
+<a class="btn primary" href="/contact.html">Work with me</a>
+</div>
+</div>
+</header>
+
+<main>
+<section class="section">
+<div class="wrap">
+<div class="section-head">
+<div>
+<div class="eyebrow">Codex Referral Program</div>
+<h1>Verify your email address.</h1>
+<p class="lead">One more step before you can access your referral dashboard.</p>
+</div>
+</div>
+
+<div class="card referral-auth-card referral-verify-card">
+<form id="referral-verify-form" class="form">
+<div>
+<label for="verification-email">Email address</label>
+<input id="verification-email" name="email" type="email" autocomplete="email" required>
+</div>
+
+<div>
+<label for="verification-code">Eight-digit verification code</label>
+<input id="verification-code" name="code" class="verification-code-input"
+type="text" inputmode="numeric" autocomplete="one-time-code"
+pattern="[0-9]{8}" minlength="8" maxlength="8"
+placeholder="00000000" aria-describedby="verification-help" required>
+<p id="verification-help" class="small-note verification-help">
+Enter the code sent to your email. The code expires after 10 minutes.
+</p>
+</div>
+
+<button class="btn primary" id="verification-submit" type="submit">
+Verify email
+</button>
+
+<button class="btn" id="verification-resend" type="button">
+Resend verification code
+</button>
+
+<div id="referral-verify-status" class="form-status"
+role="status" aria-live="polite"></div>
+</form>
+
+<p class="small-note" style="margin-top:18px">
+Already verified? <a href="/referral-login.html">Sign in</a>.
+</p>
+<p class="small-note">
+Need to start again? <a href="/referral-register.html">Return to registration</a>.
+</p>
+</div>
+</div>
+</section>
+</main>
+
+<footer class="site-footer">
+<div class="wrap">
+<div>© <span data-year></span> Codex Inc. All rights reserved.</div>
+</div>
+</footer>
+
+<script src="/assets/app.js"></script>
+<script src="/assets/referral-verify.js"></script>
+</body>
+</html>

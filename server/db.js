@@ -213,6 +213,28 @@ async function initDb() {
   `);
 
   await query(`
+    CREATE TABLE IF NOT EXISTS referral_pending_registrations (
+      id bigserial PRIMARY KEY,
+      full_name text NOT NULL,
+      email text NOT NULL UNIQUE,
+      phone text,
+      password_hash text NOT NULL,
+      referral_code text NOT NULL UNIQUE,
+      verification_code_hash text NOT NULL,
+      verification_expires_at timestamptz NOT NULL,
+      failed_attempts integer NOT NULL DEFAULT 0
+        CHECK (failed_attempts >= 0),
+      last_code_sent_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+
+  await query(`
+    CREATE INDEX IF NOT EXISTS idx_referral_pending_registrations_expiry
+    ON referral_pending_registrations(verification_expires_at)
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS referral_clicks (
       id bigserial PRIMARY KEY,
       referral_user_id integer NOT NULL

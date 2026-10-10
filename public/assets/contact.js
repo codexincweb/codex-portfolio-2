@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const data=Object.fromEntries(new FormData(form).entries());
 
     try{
-      const response=await fetch('/api/referrals/lead',{
+      const response=await fetch('/api/contact',{
         method:'POST',
         headers:{
           'Content-Type':'application/json'

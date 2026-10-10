@@ -9,6 +9,7 @@ const multer=require('multer');
 const {v2:cloudinary}=require('cloudinary');
 const {pool,query,initDb}=require('./db');
 const nodemailer=require('nodemailer');
+const {OAuth2Client}=require('google-auth-library');
 const Groq=require('groq-sdk');
 require('dotenv').config();
 
@@ -176,6 +177,80 @@ const mailer=nodemailer.createTransport({
   }
 });
 
+function generateReferralVerificationCode(){
+  return String(crypto.randomInt(0,100000000)).padStart(8,'0');
+}
+
+function hashReferralVerificationCode(code){
+  return crypto.createHash('sha256')
+    .update(`${String(code)}:${process.env.SESSION_SECRET||'dev-secret'}`)
+    .digest('hex');
+}
+
+async function sendReferralVerificationEmail(email,fullName,code){
+  const name=String(fullName||'there').trim()||'there';
+
+  await mailer.sendMail({
+    from:`${process.env.SMTP_FROM_NAME||'Codex Inc'} <${process.env.SMTP_FROM_EMAIL||process.env.SMTP_USER}>`,
+    to:email,
+    subject:'Verify your Codex Inc Referral Program email',
+    text:[
+      `Hello ${name},`,
+      '',
+      'Use the verification code below to verify your email address:',
+      '',
+      code,
+      '',
+      'This code expires in 10 minutes. Do not share it with anyone.',
+      'If you did not request this registration, you can ignore this email.',
+      '',
+      'Codex Inc'
+    ].join('\\n'),
+    html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#172033">
+      <h2 style="margin-bottom:12px">Verify your email</h2>
+      <p>Hello ${name.replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]))},</p>
+      <p>Use this eight-digit code to verify your Codex Inc Referral Program account:</p>
+      <div style="font-size:30px;font-weight:700;letter-spacing:7px;padding:18px;background:#f2f5f9;border-radius:10px;text-align:center">${code}</div>
+      <p>This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p>
+      <p>If you did not request this registration, you can ignore this email.</p>
+      <p>Codex Inc</p>
+    </div>`
+  });
+}
+
+async function sendReferralWelcomeEmail(email,fullName,referralCode){
+  const name=String(fullName||'there').trim()||'there';
+  const referralUrl=`${String(process.env.SITE_URL||'https://codexwebwork.vercel.app').replace(/\/$/,'')}/ref/${referralCode}`;
+
+  await mailer.sendMail({
+    from:`${process.env.SMTP_FROM_NAME||'Codex Inc'} <${process.env.SMTP_FROM_EMAIL||process.env.SMTP_USER}>`,
+    to:email,
+    subject:'Welcome to the Codex Inc Referral Program',
+    text:[
+      `Hello ${name},`,
+      '',
+      'Your email has been verified and your referral account is ready.',
+      'You can earn a 5% commission on qualifying payments Codex Inc receives from clients referred through your referral link.',
+      '',
+      `Your referral link: ${referralUrl}`,
+      '',
+      'Keep your link available when sharing Codex Inc services. Commissions are subject to the Referral Program Terms & Conditions.',
+      '',
+      'Welcome aboard,',
+      'Codex Inc'
+    ].join('\\n'),
+    html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#172033">
+      <h2>Welcome to Codex Inc!</h2>
+      <p>Hello ${name.replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]))},</p>
+      <p>Your email has been verified and your referral account is ready.</p>
+      <p>You can earn a <strong>5% commission</strong> on qualifying payments Codex Inc receives from clients referred through your referral link.</p>
+      <p><a href="${referralUrl}" style="display:inline-block;padding:12px 18px;background:#166534;color:#fff;text-decoration:none;border-radius:8px">View your referral link</a></p>
+      <p>Commissions are subject to the Referral Program Terms &amp; Conditions.</p>
+      <p>Welcome aboard,<br>Codex Inc</p>
+    </div>`
+  });
+}
+
 async function sendTeamUpNotification(application){
   const skills=Array.isArray(application.skills)
     ? application.skills.join(', ')
@@ -334,6 +409,203 @@ function checkChatRateLimit(req){
 }
 
 
+function getReferralGoogleClient(){
+  const clientId=process.env.GOOGLE_CLIENT_ID;
+  const clientSecret=process.env.GOOGLE_CLIENT_SECRET;
+  const callbackUrl=process.env.GOOGLE_CALLBACK_URL;
+
+  if(!clientId||!clientSecret||!callbackUrl){
+    throw new Error('Google OAuth configuration is incomplete.');
+  }
+
+  return new OAuth2Client(clientId,clientSecret,callbackUrl);
+}
+
+app.get('/api/referrals/auth/google',(req,res)=>{
+  try{
+    const client=getReferralGoogleClient();
+    const state=crypto.randomBytes(32).toString('hex');
+    req.session.googleOAuthState=state;
+
+    req.session.save(error=>{
+      if(error){
+        console.error('Google OAuth session error:',error.message);
+        return res.redirect('/referral-login.html?google=failed');
+      }
+
+      res.redirect(client.generateAuthUrl({
+        response_type:'code',
+        scope:['openid','email','profile'],
+        state,
+        prompt:'select_account'
+      }));
+    });
+  }catch(error){
+    console.error('Google OAuth start error:',error.message);
+    res.redirect('/referral-login.html?google=unavailable');
+  }
+});
+
+app.get('/api/referrals/auth/google/callback',async(req,res)=>{
+  const fail=()=>{
+    if(req.session)delete req.session.googleOAuthState;
+    return res.redirect('/referral-login.html?google=failed');
+  };
+
+  if(req.query.error){
+    delete req.session.googleOAuthState;
+    return res.redirect('/referral-login.html?google=cancelled');
+  }
+
+  const receivedState=String(req.query.state||'');
+  const expectedState=String(req.session.googleOAuthState||'');
+  delete req.session.googleOAuthState;
+
+  if(!receivedState||!expectedState||
+     receivedState.length!==expectedState.length||
+     !crypto.timingSafeEqual(Buffer.from(receivedState),Buffer.from(expectedState))){
+    return fail();
+  }
+
+  const code=String(req.query.code||'');
+  if(!code)return fail();
+
+  let user;
+  let isNewUser=false;
+
+  try{
+    const client=getReferralGoogleClient();
+    const tokenResult=await client.getToken(code);
+    const idToken=tokenResult.tokens.id_token;
+    if(!idToken)throw new Error('Google did not return an ID token.');
+
+    const ticket=await client.verifyIdToken({
+      idToken,
+      audience:process.env.GOOGLE_CLIENT_ID
+    });
+    const identity=ticket.getPayload();
+
+    if(!identity||!identity.sub||identity.email_verified!==true){
+      throw new Error('Google identity or verified email is missing.');
+    }
+
+    const email=normalizeReferralEmail(identity.email);
+    const googleId=String(identity.sub);
+    const fullName=String(identity.name||email.split('@')[0]).trim().slice(0,200);
+    const avatarUrl=identity.picture?String(identity.picture).slice(0,2000):null;
+
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      throw new Error('Google returned an invalid email address.');
+    }
+
+    const dbClient=await pool.connect();
+
+    try{
+      await dbClient.query('BEGIN');
+
+      const existing=await dbClient.query(
+        `SELECT id,full_name,email,phone,password_hash,google_id,
+                avatar_url,referral_code,status,email_verified,
+                created_at,last_login_at
+         FROM referral_users
+         WHERE email=$1 OR google_id=$2
+         FOR UPDATE`,
+        [email,googleId]
+      );
+
+      if(existing.rowCount){
+        const matched=existing.rows.find(
+          row=>row.email===email||row.google_id===googleId
+        );
+
+        if(!matched||matched.email!==email||
+           (matched.google_id&&matched.google_id!==googleId)){
+          throw new Error('This Google account cannot be safely linked.');
+        }
+
+        if(matched.status!=='active'){
+          await dbClient.query('COMMIT');
+          return res.redirect('/referral-login.html?google=suspended');
+        }
+
+        const updated=await dbClient.query(
+          `UPDATE referral_users
+           SET google_id=COALESCE(google_id,$2),
+               avatar_url=COALESCE($3,avatar_url),
+               email_verified=true,
+               last_login_at=now(),
+               updated_at=now()
+           WHERE id=$1
+           RETURNING id,full_name,email,phone,password_hash,google_id,
+                     avatar_url,referral_code,status,email_verified,
+                     created_at,last_login_at`,
+          [matched.id,googleId,avatarUrl]
+        );
+        user=updated.rows[0];
+      }else{
+        let referralCode;
+        let available=false;
+
+        for(let attempt=0;attempt<5;attempt++){
+          referralCode=generateReferralCode();
+          const collision=await dbClient.query(
+            `SELECT 1 FROM referral_users WHERE referral_code=$1
+             UNION ALL
+             SELECT 1 FROM referral_pending_registrations WHERE referral_code=$1
+             LIMIT 1`,
+            [referralCode]
+          );
+          if(!collision.rowCount){available=true;break;}
+        }
+
+        if(!available)throw new Error('Unable to generate a referral code.');
+
+        const created=await dbClient.query(
+          `INSERT INTO referral_users
+           (full_name,email,google_id,avatar_url,referral_code,email_verified)
+           VALUES($1,$2,$3,$4,$5,true)
+           RETURNING id,full_name,email,phone,password_hash,google_id,
+                     avatar_url,referral_code,status,email_verified,
+                     created_at,last_login_at`,
+          [fullName,email,googleId,avatarUrl,referralCode]
+        );
+        user=created.rows[0];
+        isNewUser=true;
+      }
+
+      await dbClient.query('COMMIT');
+    }catch(error){
+      await dbClient.query('ROLLBACK').catch(()=>{});
+      throw error;
+    }finally{
+      dbClient.release();
+    }
+
+    await new Promise((resolve,reject)=>{
+      req.session.regenerate(error=>error?reject(error):resolve());
+    });
+    req.session.referralUser={id:user.id};
+    req.session.cookie.maxAge=1000*60*60*24*REFERRAL_SESSION_DAYS;
+
+    await new Promise((resolve,reject)=>{
+      req.session.save(error=>error?reject(error):resolve());
+    });
+
+    if(isNewUser){
+      try{
+        await sendReferralWelcomeEmail(user.email,user.full_name,user.referral_code);
+      }catch(error){
+        console.error('Google signup welcome email error:',error.message);
+      }
+    }
+
+    return res.redirect('/referral-dashboard.html');
+  }catch(error){
+    console.error('Google OAuth callback error:',error.message);
+    return fail();
+  }
+});
+
 app.post('/api/referrals/login',async(req,res)=>{
   try{
     const email=normalizeReferralEmail(req.body.email);
@@ -442,6 +714,12 @@ app.post('/api/referrals/login',async(req,res)=>{
     if(!passwordValid){
       return res.status(401).json({
         error:'Invalid email or password.'
+      });
+    }
+
+    if(user.email_verified!==true){
+      return res.status(403).json({
+        error:'Please verify your email address before signing in.'
       });
     }
 
@@ -762,6 +1040,65 @@ app.get('/ref/:code',async(req,res)=>{
   }
 });
 
+app.post('/api/contact',async(req,res)=>{
+  try{
+    const clientName=String(req.body?.client_name||'').trim();
+    const clientEmail=normalizeReferralEmail(req.body?.client_email);
+    const clientPhone=String(req.body?.client_phone||'').trim();
+    const company=String(req.body?.company||'').trim();
+    const projectDescription=String(req.body?.project_description||'').trim();
+
+    if(clientName.length<2 || clientName.length>100){
+      return res.status(400).json({error:'Please provide your name.'});
+    }
+
+    if(clientEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(clientEmail)){
+      return res.status(400).json({error:'Please provide a valid email address.'});
+    }
+
+    if(!clientEmail && !clientPhone){
+      return res.status(400).json({error:'Please provide an email address or phone number.'});
+    }
+
+    if(projectDescription.length<10 || projectDescription.length>5000){
+      return res.status(400).json({error:'Please describe your project in 10 to 5000 characters.'});
+    }
+
+    if(!process.env.ADMIN_EMAIL){
+      console.error('Contact inquiry email failed: ADMIN_EMAIL is not configured.');
+      return res.status(503).json({error:'Contact submissions are temporarily unavailable. Please contact us through WhatsApp or email.'});
+    }
+
+    await mailer.sendMail({
+      from:`${process.env.SMTP_FROM_NAME||'Codex Inc'} <${process.env.SMTP_FROM_EMAIL||process.env.SMTP_USER}>`,
+      to:process.env.ADMIN_EMAIL,
+      ...(clientEmail ? {replyTo:clientEmail} : {}),
+      subject:`New Project Inquiry — ${clientName}`,
+      text:[
+        'A new project inquiry was submitted through the Codex Inc contact page.',
+        '',
+        `Name: ${clientName}`,
+        `Email: ${clientEmail||'Not provided'}`,
+        `Phone / WhatsApp: ${clientPhone||'Not provided'}`,
+        `Company: ${company||'Not provided'}`,
+        '',
+        'Project description:',
+        projectDescription
+      ].join('\\n')
+    });
+
+    return res.status(201).json({
+      ok:true,
+      message:'Your project inquiry has been received. We will get back to you soon.'
+    });
+  }catch(error){
+    console.error('Contact inquiry email failed:',error.message);
+    return res.status(500).json({
+      error:'Unable to send your inquiry right now. Please try again or contact us directly.'
+    });
+  }
+});
+
 app.post('/api/referrals/lead',async(req,res)=>{
   try{
     const clientName=String(
@@ -1054,97 +1391,120 @@ app.post('/api/referrals/register',async(req,res)=>{
     }
 
     const passwordHash=await hashReferralPassword(password);
+    const existingPending=await query(
+      `SELECT id,last_code_sent_at
+       FROM referral_pending_registrations
+       WHERE email=$1
+       LIMIT 1`,
+      [email]
+    );
 
-    let referralCode;
-    let attempts=0;
+    if(existingPending.rowCount){
+      const lastSentAt=new Date(
+        existingPending.rows[0].last_code_sent_at
+      ).getTime();
 
-    while(!referralCode && attempts<5){
-      attempts++;
+      const waitMs=60000-(Date.now()-lastSentAt);
 
-      const candidate=generateReferralCode();
-
-      const codeCheck=await query(
-        `
-        SELECT id
-        FROM referral_users
-        WHERE referral_code=$1
-        LIMIT 1
-        `,
-        [candidate]
-      );
-
-      if(!codeCheck.rowCount){
-        referralCode=candidate;
+      if(waitMs>0){
+        return res.status(429).json({
+          error:`A verification code was recently sent. Please wait ${Math.ceil(waitMs/1000)} seconds before trying again.`
+        });
       }
     }
 
-    if(!referralCode){
-      console.error('Referral code generation failed.');
-      return res.status(500).json({
-        error:'Unable to create your referral account right now.'
+    let referralCode=existingPending.rowCount
+      ? null
+      : undefined;
+
+    if(!existingPending.rowCount){
+      let attempts=0;
+
+      while(!referralCode && attempts<10){
+        attempts++;
+        const candidate=generateReferralCode();
+
+        const codeCheck=await query(
+          `SELECT referral_code FROM referral_users WHERE referral_code=$1
+           UNION ALL
+           SELECT referral_code FROM referral_pending_registrations WHERE referral_code=$1
+           LIMIT 1`,
+          [candidate]
+        );
+
+        if(!codeCheck.rowCount){
+          referralCode=candidate;
+        }
+      }
+
+      if(!referralCode){
+        return res.status(500).json({
+          error:'Unable to prepare your referral registration right now.'
+        });
+      }
+    }
+
+    const verificationCode=generateReferralVerificationCode();
+    const verificationHash=hashReferralVerificationCode(verificationCode);
+
+    if(existingPending.rowCount){
+      await query(
+        `UPDATE referral_pending_registrations
+         SET full_name=$1,
+             phone=$2,
+             password_hash=$3,
+             verification_code_hash=$4,
+             verification_expires_at=now()+interval '10 minutes',
+             failed_attempts=0,
+             last_code_sent_at=now()
+         WHERE email=$5`,
+        [
+          fullName,
+          phone||null,
+          passwordHash,
+          verificationHash,
+          email
+        ]
+      );
+    }else{
+      await query(
+        `INSERT INTO referral_pending_registrations
+         (full_name,email,phone,password_hash,referral_code,
+          verification_code_hash,verification_expires_at)
+         VALUES($1,$2,$3,$4,$5,$6,now()+interval '10 minutes')`,
+        [
+          fullName,
+          email,
+          phone||null,
+          passwordHash,
+          referralCode,
+          verificationHash
+        ]
+      );
+    }
+
+    try{
+      await sendReferralVerificationEmail(
+        email,
+        fullName,
+        verificationCode
+      );
+    }catch(mailError){
+      console.error(
+        'Referral verification email error:',
+        mailError.message
+      );
+
+      return res.status(503).json({
+        error:'Your registration is saved, but we could not send the verification email. Please try requesting a new code shortly.'
       });
     }
 
-    const result=await query(
-      `
-      INSERT INTO referral_users
-      (
-        full_name,
-        email,
-        phone,
-        password_hash,
-        referral_code
-      )
-      VALUES($1,$2,$3,$4,$5)
-      RETURNING
-        id,
-        full_name,
-        email,
-        phone,
-        avatar_url,
-        referral_code,
-        status,
-        email_verified,
-        created_at,
-        last_login_at
-      `,
-      [
-        fullName,
-        email,
-        phone||null,
-        passwordHash,
-        referralCode
-      ]
-    );
-
-    const user=result.rows[0];
-
-    await new Promise((resolve,reject)=>{
-      req.session.regenerate(error=>{
-        if(error)return reject(error);
-        resolve();
-      });
-    });
-
-    req.session.referralUser={
-      id:user.id
-    };
-
-    req.session.cookie.maxAge=
-      1000*60*60*24*REFERRAL_SESSION_DAYS;
-
-    await new Promise((resolve,reject)=>{
-      req.session.save(error=>{
-        if(error)return reject(error);
-        resolve();
-      });
-    });
-
-    res.status(201).json({
+    return res.status(200).json({
       ok:true,
-      user:getReferralPublicUser(user),
-      referral_url:
-        `${req.protocol}://${req.get('host')}/ref/${user.referral_code}`
+      verification_required:true,
+      email,
+      message:'We sent an eight-digit verification code to your email. It expires in 10 minutes.'
     });
 
   }catch(error){
@@ -1154,9 +1514,253 @@ app.post('/api/referrals/register',async(req,res)=>{
     );
 
     res.status(500).json({
-      error:'Unable to create your referral account right now.'
+      error:'Unable to start your referral registration right now.'
     });
   }
+});
+
+app.post('/api/referrals/resend-verification',async(req,res)=>{
+  const email=normalizeReferralEmail(req.body?.email);
+
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    return res.status(400).json({
+      error:'Please provide a valid email address.'
+    });
+  }
+
+  let client;
+
+  try{
+    client=await pool.connect();
+    await client.query('BEGIN');
+
+    const result=await client.query(
+      `SELECT id,email,full_name,last_code_sent_at
+       FROM referral_pending_registrations
+       WHERE email=$1
+       FOR UPDATE`,
+      [email]
+    );
+
+    if(!result.rowCount){
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error:'No pending registration was found. Please register again.'
+      });
+    }
+
+    const pending=result.rows[0];
+    const elapsed=Date.now()-new Date(pending.last_code_sent_at).getTime();
+    const remaining=Math.ceil((60000-elapsed)/1000);
+
+    if(remaining>0){
+      await client.query('ROLLBACK');
+      return res.status(429).json({
+        error:`Please wait ${remaining} seconds before requesting another code.`,
+        retry_after_seconds:remaining
+      });
+    }
+
+    const code=generateReferralVerificationCode();
+
+    await client.query(
+      `UPDATE referral_pending_registrations
+       SET verification_code_hash=$1,
+           verification_expires_at=now()+interval '10 minutes',
+           failed_attempts=0,
+           last_code_sent_at=now()
+       WHERE id=$2`,
+      [hashReferralVerificationCode(code),pending.id]
+    );
+
+    await client.query('COMMIT');
+
+    try {
+      await sendReferralVerificationEmail(
+        pending.email,
+        pending.full_name,
+        code
+      );
+    } catch (emailError) {
+      console.error(
+        'Referral verification resend email error:',
+        emailError.message
+      );
+
+      return res.status(503).json({
+        error:'The new code was saved, but email delivery failed. Please wait 60 seconds before requesting another code.'
+      });
+    }
+
+    return res.json({
+      ok:true,
+      message:'A new verification code has been sent. It expires in 10 minutes.'
+    });
+  }catch(error){
+    if(client){
+      try{await client.query('ROLLBACK');}catch(_){}
+    }
+
+    console.error('Referral verification resend error:',error.message);
+
+    return res.status(500).json({
+      error:'Unable to send a new verification code right now. Please try again later.'
+    });
+  }finally{
+    if(client)client.release();
+  }
+});
+
+app.post('/api/referrals/verify-email',async(req,res)=>{
+  const email=normalizeReferralEmail(req.body?.email);
+  const code=String(req.body?.code||'').trim();
+
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    return res.status(400).json({error:'Please provide a valid email address.'});
+  }
+
+  if(!/^\d{8}$/.test(code)){
+    return res.status(400).json({error:'Enter the eight-digit verification code.'});
+  }
+
+  let client;
+  let user;
+
+  try{
+    client=await pool.connect();
+    await client.query('BEGIN');
+
+    const pendingResult=await client.query(
+      `SELECT *
+       FROM referral_pending_registrations
+       WHERE email=$1
+       FOR UPDATE`,
+      [email]
+    );
+
+    if(!pendingResult.rowCount){
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error:'No pending registration was found. Please register again.'
+      });
+    }
+
+    const pending=pendingResult.rows[0];
+
+    if(new Date(pending.verification_expires_at).getTime()<=Date.now()){
+      await client.query('ROLLBACK');
+
+      return res.status(400).json({
+        error:'Your verification code has expired. Use Resend verification code to receive a new one.'
+      });
+    }
+
+    if(pending.failed_attempts>=5){
+      await client.query('ROLLBACK');
+      return res.status(429).json({
+        error:'Too many incorrect attempts. Please request a new verification code.'
+      });
+    }
+
+    const expected=Buffer.from(pending.verification_code_hash,'hex');
+    const supplied=Buffer.from(hashReferralVerificationCode(code),'hex');
+    const valid=expected.length===supplied.length &&
+      crypto.timingSafeEqual(expected,supplied);
+
+    if(!valid){
+      await client.query(
+        `UPDATE referral_pending_registrations
+         SET failed_attempts=failed_attempts+1
+         WHERE id=$1`,
+        [pending.id]
+      );
+      await client.query('COMMIT');
+
+      return res.status(400).json({
+        error:'That verification code is incorrect.'
+      });
+    }
+
+    const created=await client.query(
+      `INSERT INTO referral_users
+       (full_name,email,phone,password_hash,referral_code,email_verified)
+       VALUES($1,$2,$3,$4,$5,true)
+       RETURNING id,full_name,email,phone,avatar_url,referral_code,
+                 status,email_verified,created_at,last_login_at`,
+      [
+        pending.full_name,
+        pending.email,
+        pending.phone,
+        pending.password_hash,
+        pending.referral_code
+      ]
+    );
+
+    user=created.rows[0];
+
+    await client.query(
+      'DELETE FROM referral_pending_registrations WHERE id=$1',
+      [pending.id]
+    );
+
+    await client.query('COMMIT');
+  }catch(error){
+    if(client){
+      try{await client.query('ROLLBACK');}catch(_){}
+    }
+
+    console.error('Referral email verification error:',error.message);
+
+    return res.status(500).json({
+      error:'Unable to verify your email right now. Please try again.'
+    });
+  }finally{
+    if(client)client.release();
+  }
+
+  try{
+    await new Promise((resolve,reject)=>{
+      req.session.regenerate(error=>{
+        if(error)return reject(error);
+        resolve();
+      });
+    });
+
+    req.session.referralUser={id:user.id};
+    req.session.cookie.maxAge=1000*60*60*24*REFERRAL_SESSION_DAYS;
+
+    await query(
+      'UPDATE referral_users SET last_login_at=now(),updated_at=now() WHERE id=$1',
+      [user.id]
+    );
+
+    await new Promise((resolve,reject)=>{
+      req.session.save(error=>{
+        if(error)return reject(error);
+        resolve();
+      });
+    });
+  }catch(error){
+    console.error('Referral verification session error:',error.message);
+    return res.status(500).json({
+      error:'Your email was verified, but sign-in could not be completed. Please log in.'
+    });
+  }
+
+  try{
+    await sendReferralWelcomeEmail(user.email,user.full_name,user.referral_code);
+  }catch(error){
+    console.error('Referral welcome email error:',error.message);
+  }
+
+  return res.json({
+    ok:true,
+    user:getReferralPublicUser({
+      ...user,
+      last_login_at:new Date()
+    }),
+    referral_url:`${req.protocol}://${req.get('host')}/ref/${user.referral_code}`
+  });
 });
 
 app.post('/api/chat', async (req,res)=>{
