@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/dashboard",
+      "destination": "/referral-dashboard.html"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/index"
     },

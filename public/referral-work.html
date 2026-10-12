@@ -34,7 +34,7 @@
 <header class="site-header">
 <div class="wrap nav">
 <a class="brand" href="/">Codex Inc</a>
-<nav class="navlinks">
+<button class="mobile-menu-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="primary-navigation"><span></span><span></span><span></span></button><nav class="navlinks" id="primary-navigation"><a href="/referrals.html">Affiliate Program</a>
 <a href="/">Home</a>
 <a href="/about.html">About us</a>
 <a href="/works.html">Works</a>
@@ -54,15 +54,7 @@
 <section>
 <div class="rw-eyebrow">Referred project</div>
 <h1 class="rw-title">Let's build something useful.</h1>
-<p class="rw-lead">You've reached Codex Inc through one of our partners. Tell us about the project you need and we'll review the request and get back to you.</p>
-
-<div class="rw-note">
-<div class="rw-note-mark">5%</div>
-<div>
-<strong>Partner referral tracked</strong>
-<span>Your request is connected to the partner who referred you. If your project leads to a payment received by Codex Inc, the referring partner earns a 5% commission.</span>
-</div>
-</div>
+<p class="rw-lead">Tell us about the project you need. We'll review your request and get back to you.</p>
 </section>
 
 <section class="rw-form">
@@ -101,52 +93,109 @@
 <script src="/assets/app.js"></script>
 <script>
 (function(){
-const form=document.getElementById('referral-work-form');
-const status=document.getElementById('rw-status');
-const refInfo=document.getElementById('rw-ref');
-const params=new URLSearchParams(window.location.search);
-const ref=params.get('ref');
+  const form = document.getElementById('referral-work-form');
+  const status = document.getElementById('rw-status');
+  const refInfo = document.getElementById('rw-ref');
+  const submitButton = form.querySelector('button[type="submit"]');
+  const params = new URLSearchParams(window.location.search);
+  const urlRef = (params.get('ref') || '').trim();
+  let submitting = false;
 
-if(ref){
-  refInfo.textContent='Referral reference: '+ref.toUpperCase();
-}
+  function showStatus(message, kind) {
+    status.textContent = message;
+    status.className = 'rw-status ' + (kind || '');
+    status.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  }
 
-form.addEventListener('submit',async function(event){
-  event.preventDefault();
-  status.textContent='Sending your project request...';
-  status.className='rw-status';
+  if (urlRef) {
+    refInfo.textContent = 'Referral reference: ' + urlRef.toUpperCase();
+  }
 
-  const body={
-    client_name:form.client_name.value.trim(),
-    client_email:form.client_email.value.trim(),
-    client_phone:form.client_phone.value.trim(),
-    company:form.company.value.trim(),
-    project_description:form.project_description.value.trim(),
-    referral_code:ref ? ref.toUpperCase() : ''
-  };
+  window.addEventListener('pageshow', function() {
+    submitting = false;
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.removeAttribute('aria-busy');
+    }
+  });
 
-  try{
-    const response=await fetch('/api/referrals/lead',{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      credentials:'same-origin',
-      body:JSON.stringify(body)
-    });
+  form.addEventListener('submit', async function(event) {
+    event.preventDefault();
 
-    const data=await response.json().catch(()=>({}));
+    if (submitting) return;
 
-    if(!response.ok){
-      throw new Error(data.error||'Unable to send your project request.');
+    if (!form.reportValidity()) return;
+
+    const referralCode = (
+      urlRef ||
+      document.cookie.split('; ').find(row => row.startsWith('referral_code='))?.split('=').slice(1).join('=') ||
+      ''
+    );
+
+    if (!referralCode) {
+      showStatus(
+        'This form needs to be opened using an active referral link. Please ask the person who referred you to share their project link again.',
+        'error'
+      );
+      return;
     }
 
-    form.reset();
-    status.textContent='Your project request has been received. Codex Inc will review it and get back to you.';
-    status.className='rw-status success';
-  }catch(error){
-    status.textContent=error.message||'Unable to send your project request.';
-    status.className='rw-status error';
-  }
-});
+    const body = {
+      client_name: form.elements.client_name.value.trim(),
+      client_email: form.elements.client_email.value.trim(),
+      client_phone: form.elements.client_phone.value.trim(),
+      company: form.elements.company.value.trim(),
+      project_description: form.elements.project_description.value.trim(),
+      referral_code: referralCode.toUpperCase()
+    };
+
+    if (!body.client_email && !body.client_phone) {
+      showStatus('Please provide an email address or phone number so we can contact you.', 'error');
+      return;
+    }
+
+    submitting = true;
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.setAttribute('aria-busy', 'true');
+      submitButton.dataset.originalText = submitButton.textContent;
+      submitButton.textContent = 'Sending request…';
+    }
+    showStatus('Sending your project request…', '');
+
+    try {
+      const response = await fetch('/api/referrals/lead', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.ok !== true) {
+        throw new Error(data.error || 'Unable to confirm your project request. Your details have been kept; please try again.');
+      }
+
+      form.reset();
+      showStatus(
+        'Your project request has been received successfully. Codex Inc will review it and get back to you.',
+        'success'
+      );
+    } catch (error) {
+      showStatus(
+        error.message || 'Unable to submit your request. Your details have been kept; please try again.',
+        'error'
+      );
+    } finally {
+      submitting = false;
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.removeAttribute('aria-busy');
+        submitButton.textContent = submitButton.dataset.originalText || 'Send project request';
+      }
+    }
+  });
 })();
 </script>
 </body>

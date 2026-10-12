@@ -220,7 +220,9 @@ async function sendReferralVerificationEmail(email,fullName,code){
 
 async function sendReferralWelcomeEmail(email,fullName,referralCode){
   const name=String(fullName||'there').trim()||'there';
-  const referralUrl=`${String(process.env.SITE_URL||'https://codexwebwork.vercel.app').replace(/\/$/,'')}/ref/${referralCode}`;
+  const siteUrl=String(process.env.SITE_URL||'https://codexwebwork.vercel.app').replace(/\/$/,'');
+  const dashboardUrl=`${siteUrl}/dashboard`;
+  const safeName=name.replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]));
 
   await mailer.sendMail({
     from:`${process.env.SMTP_FROM_NAME||'Codex Inc'} <${process.env.SMTP_FROM_EMAIL||process.env.SMTP_USER}>`,
@@ -230,22 +232,19 @@ async function sendReferralWelcomeEmail(email,fullName,referralCode){
       `Hello ${name},`,
       '',
       'Your email has been verified and your referral account is ready.',
-      'You can earn a 5% commission on qualifying payments Codex Inc receives from clients referred through your referral link.',
+      'Sign in to your affiliate dashboard to access your account and referral tools.',
       '',
-      `Your referral link: ${referralUrl}`,
-      '',
-      'Keep your link available when sharing Codex Inc services. Commissions are subject to the Referral Program Terms & Conditions.',
+      `Go to Your Affiliate Dashboard: ${dashboardUrl}`,
       '',
       'Welcome aboard,',
       'Codex Inc'
-    ].join('\\n'),
+    ].join('\n'),
     html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#172033">
       <h2>Welcome to Codex Inc!</h2>
-      <p>Hello ${name.replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]))},</p>
+      <p>Hello ${safeName},</p>
       <p>Your email has been verified and your referral account is ready.</p>
-      <p>You can earn a <strong>5% commission</strong> on qualifying payments Codex Inc receives from clients referred through your referral link.</p>
-      <p><a href="${referralUrl}" style="display:inline-block;padding:12px 18px;background:#166534;color:#fff;text-decoration:none;border-radius:8px">View your referral link</a></p>
-      <p>Commissions are subject to the Referral Program Terms &amp; Conditions.</p>
+      <p>Sign in to your affiliate dashboard to access your account and referral tools.</p>
+      <p><a href="${dashboardUrl}" style="display:inline-block;padding:12px 18px;background:#1877f2;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Go to Your Affiliate Dashboard</a></p>
       <p>Welcome aboard,<br>Codex Inc</p>
     </div>`
   });
@@ -1922,6 +1921,12 @@ ${JSON.stringify(knowledge,null,2)}
   }
 });
 app.use(express.static(path.join(__dirname,'..','public')));
+
+// Friendly affiliate dashboard URL (also supported by vercel.json).
+app.get('/dashboard',(req,res) => {
+  res.sendFile(path.join(__dirname,'..','public','referral-dashboard.html'));
+});
+
 
 const admin=(req,res,next)=>req.session?.admin?next():res.status(401).json({error:'Unauthorized'});
 

@@ -527,17 +527,22 @@
 
       if (!input) return;
 
+      const eyeOpen = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>';
+      const eyeClosed = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a16 16 0 0 1-3.1 3.7"/><path d="M6.2 6.3C3.5 8.1 2 12 2 12s3.5 6 10 6c1.3 0 2.5-.3 3.5-.7"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
+      function syncPasswordIcon() {
+        const visible = input.type === 'text';
+        button.innerHTML = visible ? eyeClosed : eyeOpen;
+        button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+        button.setAttribute('title', visible ? 'Hide password' : 'Show password');
+        button.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      }
+
+      syncPasswordIcon();
       button.addEventListener('click', () => {
-        const showing = input.type === 'text';
-        input.type = showing ? 'password' : 'text';
-        button.setAttribute(
-          'aria-label',
-          showing ? 'Show password' : 'Hide password'
-        );
-        button.setAttribute(
-          'title',
-          showing ? 'Show password' : 'Hide password'
-        );
+        input.type = input.type === 'password' ? 'text' : 'password';
+        syncPasswordIcon();
+        input.focus();
       });
     });
 

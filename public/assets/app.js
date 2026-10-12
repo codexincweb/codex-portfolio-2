@@ -1,6 +1,6 @@
 (function(){
   const saved=localStorage.getItem('codex-theme');
-  if(saved!=='light') document.documentElement.classList.add('dark');
+  if(saved==='dark') document.documentElement.classList.add('dark');
 
   function updateThemeButton(){
     const btn=document.querySelector('[data-theme-toggle]');
@@ -169,8 +169,38 @@
     updateThemeButton();
   };
 
+
   window.updateThemeButton=updateThemeButton;
   updateThemeButton();
+
+  // Accessible responsive navigation.
+  document.querySelectorAll('.mobile-menu-toggle').forEach(function(button){
+    const nav = button.closest('.nav');
+    const links = nav && nav.querySelector('.navlinks');
+    if(!nav || !links) return;
+
+    function setMenu(open){
+      nav.classList.toggle('nav-menu-open', open);
+      button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      button.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+    }
+
+    button.addEventListener('click', function(){
+      setMenu(!nav.classList.contains('nav-menu-open'));
+    });
+
+    links.querySelectorAll('a').forEach(function(link){
+      link.addEventListener('click', function(){ setMenu(false); });
+    });
+
+    document.addEventListener('keydown', function(event){
+      if(event.key === 'Escape') setMenu(false);
+    });
+
+    window.addEventListener('resize', function(){
+      if(window.innerWidth > 760) setMenu(false);
+    });
+  });
 })();
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const icons={
@@ -188,39 +218,151 @@ async function load(){shell();try{const p=await api('/api/profile');applyProfile
 load();
 
 /* =========================================
-   Premium page loading + scroll reveal
+   Codex Inc — responsive crystal skeleton loader
    ========================================= */
 
 (function(){
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  function isAnnouncementPage(){
+    const path = window.location.pathname.toLowerCase();
+    return path === '/update.html' ||
+           path === '/updates.html' ||
+           path.endsWith('/update.html') ||
+           path.endsWith('/updates.html');
+  }
+
+  function skeletonBlock(className, width){
+    return `<span class="cx-skeleton ${className || ''}"${width ? ` style="--sk-width:${width}"` : ''} aria-hidden="true"></span>`;
+  }
+
   function createLoader(){
-    if(document.querySelector('.page-loader')) return;
+    if (isAnnouncementPage() || document.querySelector('.page-loader')) return;
 
-    const loader=document.createElement('div');
-    loader.className='page-loader';
-    loader.setAttribute('aria-hidden','true');
-    loader.innerHTML=`
-      <div class="page-loader-inner">
-        <div class="page-loader-brand"></div>
-        <div class="page-loader-line"></div>
-        <div class="page-loader-line short"></div>
+    const main = document.querySelector('main');
+    if (!main) return;
+
+    const path = window.location.pathname.toLowerCase();
+    const isForm = /contact|register|login|referral-work|team-up|verify/.test(path) ||
+                   !!main.querySelector('form');
+    const isProjects = /works|services|experience|referrals/.test(path) ||
+                       !!main.querySelector('.project-card, .service-list, .experience-list');
+    const isProfile = /about/.test(path) ||
+                      !!main.querySelector('[data-profile-image], .profile-pic, .profile-placeholder');
+
+    let layout = '';
+
+    if (isProfile) {
+      layout = `
+        <div class="cx-sk-profile">
+          ${skeletonBlock('cx-sk-avatar')}
+          <div class="cx-sk-profile-copy">
+            ${skeletonBlock('cx-sk-title','68%')}
+            ${skeletonBlock('','94%')}
+            ${skeletonBlock('','82%')}
+            ${skeletonBlock('cx-sk-button','38%')}
+          </div>
+        </div>`;
+    } else {
+      layout += `
+        <div class="cx-sk-hero">
+          ${skeletonBlock('cx-sk-eyebrow','24%')}
+          ${skeletonBlock('cx-sk-title','76%')}
+          ${skeletonBlock('cx-sk-title cx-sk-title-small','54%')}
+          ${skeletonBlock('','88%')}
+          ${skeletonBlock('','72%')}
+          <div class="cx-sk-actions">
+            ${skeletonBlock('cx-sk-button','145px')}
+            ${skeletonBlock('cx-sk-button cx-sk-button-secondary','125px')}
+          </div>
+        </div>`;
+    }
+
+    if (isForm) {
+      layout += `
+        <div class="cx-sk-form">
+          ${skeletonBlock('cx-sk-title','52%')}
+          ${Array.from({length:4},()=>`
+            <div class="cx-sk-field">
+              ${skeletonBlock('cx-sk-label','32%')}
+              ${skeletonBlock('cx-sk-input','100%')}
+            </div>`).join('')}
+          ${skeletonBlock('cx-sk-input cx-sk-textarea','100%')}
+          ${skeletonBlock('cx-sk-button','190px')}
+        </div>`;
+    } else if (isProjects) {
+      layout += `
+        <div class="cx-sk-grid">
+          ${Array.from({length:3},()=>`
+            <div class="cx-sk-card">
+              ${skeletonBlock('cx-sk-image','100%')}
+              ${skeletonBlock('cx-sk-eyebrow','38%')}
+              ${skeletonBlock('cx-sk-title','78%')}
+              ${skeletonBlock('','100%')}
+              ${skeletonBlock('','72%')}
+            </div>`).join('')}
+        </div>`;
+    } else {
+      layout += `
+        <div class="cx-sk-content">
+          ${skeletonBlock('cx-sk-title','46%')}
+          ${skeletonBlock('','100%')}
+          ${skeletonBlock('','92%')}
+          ${skeletonBlock('','76%')}
+          <div class="cx-sk-grid cx-sk-grid-compact">
+            ${Array.from({length:2},()=>`
+              <div class="cx-sk-card">
+                ${skeletonBlock('cx-sk-title','65%')}
+                ${skeletonBlock('','100%')}
+                ${skeletonBlock('','80%')}
+              </div>`).join('')}
+          </div>
+        </div>`;
+    }
+
+    const loader = document.createElement('div');
+    loader.className = 'page-loader';
+    loader.setAttribute('role','status');
+    loader.setAttribute('aria-live','polite');
+    loader.setAttribute('aria-label','Loading page content');
+    loader.innerHTML = `
+      <div class="cx-loader-top">
+        <span class="cx-loader-mark" aria-hidden="true">C</span>
+        <span class="cx-loader-brand">CODEX <strong>INC</strong></span>
+        <span class="cx-loader-status"><i></i> LOADING</span>
       </div>
-    `;
+      <div class="cx-loader-progress" aria-hidden="true"><span></span></div>
+      <div class="cx-loader-layout">${layout}</div>
+      <div class="cx-loader-footer">
+        <span class="cx-loader-spinner" aria-hidden="true"></span>
+        <span>Preparing your experience</span>
+      </div>`;
 
-    document.documentElement.classList.add('page-loading');
     document.body.prepend(loader);
+    document.documentElement.classList.add('page-loading');
 
-    requestAnimationFrame(()=>{
-      requestAnimationFrame(()=>{
+    // Keep the loader visible long enough to be perceived without delaying the page.
+    const minimumVisible = reduceMotion ? 180 : 650;
+    const started = performance.now();
+
+    function hideLoader(){
+      const elapsed = performance.now() - started;
+      const wait = Math.max(0, minimumVisible - elapsed);
+
+      setTimeout(()=>{
         loader.classList.add('is-hidden');
         document.documentElement.classList.remove('page-loading');
+        setTimeout(()=>loader.remove(), reduceMotion ? 0 : 300);
+      }, wait);
+    }
 
-        setTimeout(()=>{
-          loader.remove();
-        },400);
-      });
-    });
+    if (document.readyState === 'complete') {
+      hideLoader();
+    } else {
+      window.addEventListener('load', hideLoader, {once:true});
+      // Fail safe for slow or unavailable resources; do not trap page interaction.
+      setTimeout(hideLoader, 4500);
+    }
   }
 
   function setupScrollReveal(){
@@ -248,26 +390,30 @@ load();
     });
 
     cards.forEach((card,index)=>{
+      if(card.closest('.admin-shell')) return;
+      if(card.classList.contains('reveal')) return;
+
       card.classList.add('reveal');
-      card.style.setProperty('--reveal-delay',`${Math.min(index * 90,360)}ms`);
+      card.style.setProperty('--reveal-delay', `${Math.min(index * 70, 350)}ms`);
     });
 
     if(reduceMotion){
       document.querySelectorAll('.reveal').forEach(element=>{
         element.classList.add('is-visible');
       });
+      window.refreshScrollReveal=setupScrollReveal;
       return;
     }
 
-    const observer=new IntersectionObserver((entries,obs)=>{
+    const observer=new IntersectionObserver(entries=>{
       entries.forEach(entry=>{
-        if(!entry.isIntersecting) return;
-
-        entry.target.classList.add('is-visible');
-        obs.unobserve(entry.target);
+        if(entry.isIntersecting){
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
       });
     },{
-      threshold:0.12,
+      threshold:0.08,
       rootMargin:'0px 0px -45px 0px'
     });
 
@@ -278,61 +424,16 @@ load();
     window.refreshScrollReveal=setupScrollReveal;
   }
 
+  // Preserve native browser history for reliable Android Back/Forward navigation.
   function setupPageTransitions(){
-    if(reduceMotion) return;
-
-    document.addEventListener('click',event=>{
-      const link=event.target.closest('a[href]');
-
-      if(!link) return;
-      if(link.target==='_blank') return;
-      if(link.hasAttribute('download')) return;
-
-      const href=link.getAttribute('href');
-
-      if(!href) return;
-      if(href.startsWith('#')) return;
-      if(href.startsWith('mailto:')) return;
-      if(href.startsWith('tel:')) return;
-      if(href.startsWith('javascript:')) return;
-
-      let url;
-
-      try{
-        url=new URL(href,window.location.href);
-      }catch{
-        return;
-      }
-
-      if(url.origin!==window.location.origin) return;
-      if(url.pathname===window.location.pathname && url.search===window.location.search) return;
-
-      event.preventDefault();
-
-      const loader=document.createElement('div');
-      loader.className='page-loader';
-      loader.setAttribute('aria-hidden','true');
-      loader.innerHTML=`
-        <div class="page-loader-inner">
-          <div class="page-loader-brand"></div>
-          <div class="page-loader-line"></div>
-          <div class="page-loader-line short"></div>
-        </div>
-      `;
-
-      document.documentElement.classList.add('page-loading');
-      document.body.prepend(loader);
-
-      requestAnimationFrame(()=>{
-        setTimeout(()=>{
-          window.location.href=url.href;
-        },120);
-      });
+    window.addEventListener('pageshow',()=>{
+      document.documentElement.classList.remove('page-loading');
+      document.querySelectorAll('.page-loader').forEach(loader=>loader.remove());
     });
   }
 
   function initMotion(){
-    createLoader();
+    if (!isAnnouncementPage()) createLoader();
     setupScrollReveal();
     setupPageTransitions();
   }
